@@ -114,12 +114,16 @@ def generate_level(mode):
         # Merge pair_ids for blocks with identical text (regardless of type)
         from collections import defaultdict
         text_to_pids = defaultdict(list)
+        text_has_function = {}
         for b in blocks:
             for pid in b["pair_ids"]:
                 if pid not in text_to_pids[b["text"]]:
                     text_to_pids[b["text"]].append(pid)
+            if b["type"] == "function":
+                text_has_function[b["text"]] = True
         for b in blocks:
             b["pair_ids"] = sorted(text_to_pids[b["text"]])
+            b["can_be_function"] = text_has_function.get(b["text"], False)
 
         random.shuffle(blocks)
         return {"blocks": blocks, "operators": []}
@@ -163,12 +167,16 @@ def _build_one_to_one(pairs, expected_parts):
     # Merge pair_ids for blocks with identical text (regardless of type)
     from collections import defaultdict
     text_to_pids = defaultdict(list)
+    text_has_function = {}
     for b in blocks:
         for pid in b["pair_ids"]:
             if pid not in text_to_pids[b["text"]]:
                 text_to_pids[b["text"]].append(pid)
+        if b["type"] == "function":
+            text_has_function[b["text"]] = True
     for b in blocks:
         b["pair_ids"] = sorted(text_to_pids[b["text"]])
+        b["can_be_function"] = text_has_function.get(b["text"], False)
 
     random.shuffle(blocks)
     return {"blocks": blocks, "operators": []}

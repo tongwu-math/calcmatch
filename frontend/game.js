@@ -94,6 +94,9 @@ function renderBlocks() {
         if (block.pair_ids) {
             blockDiv.dataset.pairIds = block.pair_ids.join(',');
         }
+        if (block.can_be_function) {
+            blockDiv.dataset.canBeFunction = 'true';
+        }
 
         if (gameState.currentMode === 'hard') {
             blockDiv.addEventListener('click', handleNormalBlockClick);
@@ -201,12 +204,15 @@ function handleNormalBlockClick(event) {
 
     const blockType = el.dataset.blockType;
     const elPairIds = el.dataset.pairIds.split(',').map(Number);
+    const canBeFunction = el.dataset.canBeFunction === 'true';
 
     if (gameState.activeSelection.length === 0) {
-        if (blockType !== 'function') return;
+        if (blockType !== 'function' && !canBeFunction) return;
     } else {
         const firstPairId = gameState.activeSelection[0].pairId;
-        if (blockType !== 'derivative' || !elPairIds.includes(firstPairId)) return;
+        if (!elPairIds.includes(firstPairId)) return;
+        // Normal mode: only derivative blocks. Hard mode: any type if pairId matches.
+        if (gameState.currentMode !== 'hard' && blockType !== 'derivative') return;
     }
 
     el.classList.add('is-selected');
