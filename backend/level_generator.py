@@ -111,6 +111,16 @@ def generate_level(mode):
                     "expected_parts": 3
                 })
 
+        # Merge pair_ids for blocks with identical text (regardless of type)
+        from collections import defaultdict
+        text_to_pids = defaultdict(list)
+        for b in blocks:
+            for pid in b["pair_ids"]:
+                if pid not in text_to_pids[b["text"]]:
+                    text_to_pids[b["text"]].append(pid)
+        for b in blocks:
+            b["pair_ids"] = sorted(text_to_pids[b["text"]])
+
         random.shuffle(blocks)
         return {"blocks": blocks, "operators": []}
 
