@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>DerivaMatch</title>
+    <link rel="stylesheet" href="style.css">
+    <script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+</head>
+<body>
+    <!-- Level Selection Overlay -->
+    <div id="level-overlay" class="overlay">
+        <div class="overlay-content">
+            <h1>DerivaMatch</h1>
+            <p>Select your level:</p>
+            <button class="level-btn easy-btn" onclick="selectLevel('easy')">Easy<br><small>Basic Derivatives</small></button>
+            <button class="level-btn normal-btn" onclick="selectLevel('normal')">Normal<br><small>Product &amp; Quotient Rules</small></button>
+            <button class="level-btn hard-btn" onclick="selectLevel('hard')">Hard<br><small>Chain Rule</small></button>
+        </div>
+    </div>
+
+    <!-- Pass/Fail Overlay -->
+    <div id="result-overlay" class="overlay hidden">
+        <div class="overlay-content">
+            <h1 id="result-title"></h1>
+            <p id="result-score"></p>
+            <button class="level-btn" onclick="replayLevel()">Replay</button>
+            <button class="level-btn" onclick="showLevelSelect()">Change Level</button>
+        </div>
+    </div>
+
+    <div class="game-container">
+        <header class="top-bar">
+            <div class="timer">Time: <span id="timer">60</span>s</div>
+            <div class="score">Score: <span id="score">0</span></div>
+            <span class="level-label" id="level-label"></span>
+            <button id="new-game" onclick="showLevelSelect()">New Game</button>
+        </header>
+
+        <div class="equation-bar">
+            <h3>Active Equation:</h3>
+            <div id="active-equation" class="active-equation"></div>
+            <button id="clear-equation" onclick="clearEquation()">Clear</button>
+            <button id="submit" onclick="submitMatch()" style="display:none;">Submit</button>
+        </div>
+
+        <main class="game-board">
+            <div id="block-container" class="block-container"></div>
+        </main>
+
+        <aside class="operator-panel" id="operator-panel" style="display:none;">
+            <h3>Operators &amp; Constants</h3>
+            <div id="operator-container" class="operator-container"></div>
+        </aside>
+
+        <div id="success-modal" class="modal hidden">
+            <div class="modal-content">
+                <h2>Match Found!</h2>
+                <p id="match-message"></p>
+                <button onclick="closeModal()">Continue</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="game.js"></script>
+</body>
+</html>
