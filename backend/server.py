@@ -1,6 +1,11 @@
 from flask import Flask, request, jsonify, send_from_directory
-from level_generator import generate_level
+import sys
 import os
+
+# Ensure backend/ is on the Python path
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+
+from level_generator import generate_level
 import math
 import random
 
