@@ -20,20 +20,73 @@ def generate_level(mode):
         {"pair_id": 13, "function": "\\arctan(x)", "derivative": "\\frac{1}{1 + x^2}"},
         {"pair_id": 14, "function": "\\sec(x)", "derivative": "\\sec(x)\\tan(x)"},
         {"pair_id": 15, "function": "\\csc(x)", "derivative": "-\\csc(x)\\cot(x)"},
+        {"pair_id": 16, "function": "x^{-4}", "derivative": "-4x^{-5}"},
+        {"pair_id": 17, "function": "x^{-3}", "derivative": "-3x^{-4}"},
+        {"pair_id": 18, "function": "x^{-2}", "derivative": "-2x^{-3}"},
+        {"pair_id": 19, "function": "x", "derivative": "1"},
+        {"pair_id": 20, "function": "x^{\\frac{1}{3}}", "derivative": "\\frac{1}{3}x^{-\\frac{2}{3}}"},
+        {"pair_id": 21, "function": "x^{-\\frac{1}{2}}", "derivative": "-\\frac{1}{2}x^{-\\frac{3}{2}}"},
+        {"pair_id": 22, "function": "x^{-\\frac{1}{3}}", "derivative": "-\\frac{1}{3}x^{-\\frac{4}{3}}"},
+        {"pair_id": 23, "function": "2^x", "derivative": "2^x \\ln 2"},
+        {"pair_id": 24, "function": "3^x", "derivative": "3^x \\ln 3"},
+        {"pair_id": 25, "function": "4^x", "derivative": "4^x \\ln 4"},
     ]
 
     # Normal: product and quotient rule, one-to-one matching
+    # Base functions: x, x^2, e^x, ln(x), sin(x), cos(x)
+    # Products and quotients between each pair
     normal_pairs = [
-        {"pair_id": 1, "function": "x \\sin(x)", "derivative": "\\sin(x) + x \\cdot \\cos(x)"},
-        {"pair_id": 2, "function": "x e^x", "derivative": "e^x + x \\cdot e^x"},
-        {"pair_id": 3, "function": "x \\cos(x)", "derivative": "\\cos(x) - x \\cdot \\sin(x)"},
+        # --- Existing product pairs ---
+        {"pair_id": 1, "function": "x \\sin(x)", "derivative": "\\sin(x) + x \\cos(x)"},
+        {"pair_id": 2, "function": "x e^x", "derivative": "e^x + x e^x"},
+        {"pair_id": 3, "function": "x \\cos(x)", "derivative": "\\cos(x) - x \\sin(x)"},
         {"pair_id": 4, "function": "x \\ln(x)", "derivative": "\\ln(x) + 1"},
         {"pair_id": 5, "function": "x^2 e^x", "derivative": "2x e^x + x^2 e^x"},
-        {"pair_id": 6, "function": "e^x \\sin(x)", "derivative": "e^x \\cdot \\sin(x) + e^x \\cdot \\cos(x)"},
-        {"pair_id": 7, "function": "\\frac{\\sin(x)}{x}", "derivative": "\\frac{x \\cdot \\cos(x) - \\sin(x)}{x^2}"},
+        {"pair_id": 6, "function": "e^x \\sin(x)", "derivative": "e^x \\sin(x) + e^x \\cos(x)"},
+        # --- Existing quotient pairs ---
+        {"pair_id": 7, "function": "\\frac{\\sin(x)}{x}", "derivative": "\\frac{\\cos(x) \\cdot x - \\sin(x)}{x^2}"},
         {"pair_id": 8, "function": "\\frac{x}{x + 1}", "derivative": "\\frac{1}{(x + 1)^2}"},
         {"pair_id": 9, "function": "\\frac{\\ln(x)}{x}", "derivative": "\\frac{1 - \\ln(x)}{x^2}"},
         {"pair_id": 10, "function": "\\frac{e^x}{x + 1}", "derivative": "\\frac{e^x(x + 1) - e^x}{(x + 1)^2}"},
+        # --- New product pairs ---
+        {"pair_id": 11, "function": "x^2 \\ln(x)", "derivative": "2x \\ln(x) + x"},
+        {"pair_id": 12, "function": "x^2 \\sin(x)", "derivative": "2x \\sin(x) + x^2 \\cos(x)"},
+        {"pair_id": 13, "function": "x^2 \\cos(x)", "derivative": "2x \\cos(x) - x^2 \\sin(x)"},
+        {"pair_id": 14, "function": "e^x \\ln(x)", "derivative": "e^x \\ln(x) + \\frac{e^x}{x}"},
+        {"pair_id": 15, "function": "e^x \\cos(x)", "derivative": "e^x \\cos(x) - e^x \\sin(x)"},
+        {"pair_id": 16, "function": "\\ln(x) \\sin(x)", "derivative": "\\frac{\\sin(x)}{x} + \\ln(x) \\cos(x)"},
+        {"pair_id": 17, "function": "\\ln(x) \\cos(x)", "derivative": "\\frac{\\cos(x)}{x} - \\ln(x) \\sin(x)"},
+        {"pair_id": 18, "function": "\\sin(x) \\cos(x)", "derivative": "\\cos^2(x) - \\sin^2(x)"},
+        # --- New quotient pairs: x / g ---
+        {"pair_id": 19, "function": "\\frac{x}{e^x}", "derivative": "\\frac{e^x - x e^x}{e^{2x}}"},
+        {"pair_id": 20, "function": "\\frac{x}{\\ln(x)}", "derivative": "\\frac{\\ln(x) - 1}{(\\ln(x))^2}"},
+        {"pair_id": 21, "function": "\\frac{x}{\\sin(x)}", "derivative": "\\frac{\\sin(x) - x \\cos(x)}{\\sin^2(x)}"},
+        {"pair_id": 22, "function": "\\frac{x}{\\cos(x)}", "derivative": "\\frac{\\cos(x) + x \\sin(x)}{\\cos^2(x)}"},
+        # --- New quotient pairs: x^2 / g ---
+        {"pair_id": 23, "function": "\\frac{x^2}{e^x}", "derivative": "\\frac{2x e^x - x^2 e^x}{e^{2x}}"},
+        {"pair_id": 24, "function": "\\frac{x^2}{\\ln(x)}", "derivative": "\\frac{2x \\ln(x) - x}{(\\ln(x))^2}"},
+        {"pair_id": 25, "function": "\\frac{x^2}{\\sin(x)}", "derivative": "\\frac{2x \\sin(x) - x^2 \\cos(x)}{\\sin^2(x)}"},
+        {"pair_id": 26, "function": "\\frac{x^2}{\\cos(x)}", "derivative": "\\frac{2x \\cos(x) + x^2 \\sin(x)}{\\cos^2(x)}"},
+        # --- New quotient pairs: e^x / g ---
+        {"pair_id": 27, "function": "\\frac{e^x}{x}", "derivative": "\\frac{e^x \\cdot x - e^x}{x^2}"},
+        {"pair_id": 28, "function": "\\frac{e^x}{x^2}", "derivative": "\\frac{e^x \\cdot x^2 - e^x \\cdot 2x}{x^4}"},
+        {"pair_id": 29, "function": "\\frac{e^x}{\\ln(x)}", "derivative": "\\frac{e^x \\ln(x) - \\frac{e^x}{x}}{(\\ln(x))^2}"},
+        {"pair_id": 30, "function": "\\frac{e^x}{\\sin(x)}", "derivative": "\\frac{e^x \\sin(x) - e^x \\cos(x)}{\\sin^2(x)}"},
+        {"pair_id": 31, "function": "\\frac{e^x}{\\cos(x)}", "derivative": "\\frac{e^x \\cos(x) + e^x \\sin(x)}{\\cos^2(x)}"},
+        # --- New quotient pairs: ln(x) / g ---
+        {"pair_id": 32, "function": "\\frac{\\ln(x)}{x^2}", "derivative": "\\frac{1 - 2 \\ln(x)}{x^3}"},
+        {"pair_id": 33, "function": "\\frac{\\ln(x)}{e^x}", "derivative": "\\frac{\\frac{e^x}{x} - e^x \\ln(x)}{e^{2x}}"},
+        {"pair_id": 34, "function": "\\frac{\\ln(x)}{\\sin(x)}", "derivative": "\\frac{\\frac{\\sin(x)}{x} - \\ln(x) \\cos(x)}{\\sin^2(x)}"},
+        {"pair_id": 35, "function": "\\frac{\\ln(x)}{\\cos(x)}", "derivative": "\\frac{\\frac{\\cos(x)}{x} + \\ln(x) \\sin(x)}{\\cos^2(x)}"},
+        # --- New quotient pairs: sin(x) / g ---
+        {"pair_id": 36, "function": "\\frac{\\sin(x)}{x^2}", "derivative": "\\frac{\\cos(x) \\cdot x - 2 \\sin(x)}{x^3}"},
+        {"pair_id": 37, "function": "\\frac{\\sin(x)}{e^x}", "derivative": "\\frac{\\cos(x) e^x - \\sin(x) e^x}{e^{2x}}"},
+        {"pair_id": 38, "function": "\\frac{\\sin(x)}{\\ln(x)}", "derivative": "\\frac{\\cos(x) \\ln(x) - \\frac{\\sin(x)}{x}}{(\\ln(x))^2}"},
+        # --- New quotient pairs: cos(x) / g ---
+        {"pair_id": 39, "function": "\\frac{\\cos(x)}{x}", "derivative": "\\frac{-\\sin(x) \\cdot x - \\cos(x)}{x^2}"},
+        {"pair_id": 40, "function": "\\frac{\\cos(x)}{x^2}", "derivative": "\\frac{-\\sin(x) \\cdot x - 2 \\cos(x)}{x^3}"},
+        {"pair_id": 41, "function": "\\frac{\\cos(x)}{e^x}", "derivative": "\\frac{-\\sin(x) e^x - \\cos(x) e^x}{e^{2x}}"},
+        {"pair_id": 42, "function": "\\frac{\\cos(x)}{\\ln(x)}", "derivative": "\\frac{-\\sin(x) \\ln(x) - \\frac{\\cos(x)}{x}}{(\\ln(x))^2}"},
     ]
 
     # Hard: complex chain rule, multi-block factors for f'
