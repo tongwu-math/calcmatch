@@ -207,7 +207,7 @@ function handleNormalBlockClick(event) {
     const canBeFunction = el.dataset.canBeFunction === 'true';
 
     if (gameState.activeSelection.length === 0) {
-        if (blockType !== 'function' && !canBeFunction) return;
+        if (blockType !== 'function') return;
     } else {
         const firstPairId = gameState.activeSelection[0].pairId;
         if (!elPairIds.includes(firstPairId)) return;
