@@ -1,4 +1,5 @@
 import random
+from collections import Counter, defaultdict
 
 def generate_level(mode):
     """Generate level data based on difficulty mode"""
@@ -147,7 +148,6 @@ def generate_level(mode):
             for f in p["factors"]:
                 factor_entries.append({"text": f, "pair_id": p["pair_id"]})
 
-        from collections import Counter
         text_counts = Counter(fe["text"] for fe in factor_entries)
         text_to_ids = {}
         for fe in factor_entries:
@@ -158,6 +158,8 @@ def generate_level(mode):
         for text, pids in text_to_ids.items():
             count = text_counts[text]
             for _ in range(count):
+                # All hard pairs currently have expected_parts=3;
+                # if varied, compute from pair lookup
                 blocks.append({
                     "function_id": [],
                     "factor_id": pids,
@@ -167,7 +169,6 @@ def generate_level(mode):
                 })
 
         # Merge function_id and factor_id for blocks with identical text
-        from collections import defaultdict
         text_to_function_ids = defaultdict(list)
         text_to_factor_ids = defaultdict(list)
         for b in blocks:
@@ -203,7 +204,6 @@ def _build_one_to_one(pairs, expected_parts):
     for pair in pairs:
         deriv_entries.append({"text": pair["derivative"], "pair_id": pair["pair_id"]})
 
-    from collections import Counter
     text_counts = Counter(de["text"] for de in deriv_entries)
     text_to_ids = {}
     for de in deriv_entries:
@@ -223,7 +223,6 @@ def _build_one_to_one(pairs, expected_parts):
             })
 
     # Merge function_id and factor_id for blocks with identical text
-    from collections import defaultdict
     text_to_function_ids = defaultdict(list)
     text_to_factor_ids = defaultdict(list)
     for b in blocks:

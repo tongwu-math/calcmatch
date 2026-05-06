@@ -15,12 +15,11 @@ const blockContainer = document.getElementById('block-container');
 const activeEquation = document.getElementById('active-equation');
 const timerElement = document.getElementById('timer');
 const scoreElement = document.getElementById('score');
-const submitBtn = document.getElementById('submit');
-const levelLabel = document.getElementById('level-label');
 const levelOverlay = document.getElementById('level-overlay');
+const resultScore = document.getElementById('result-score');
 const resultOverlay = document.getElementById('result-overlay');
 const resultTitle = document.getElementById('result-title');
-const resultScore = document.getElementById('result-score');
+const levelLabel = document.getElementById('level-label');
 
 // ============================================================
 // LEVEL SELECTION & GAME FLOW
@@ -99,13 +98,17 @@ function renderBlocks() {
         }
 
         if (gameState.currentMode === 'hard') {
-            blockDiv.addEventListener('click', handleNormalBlockClick);
+            blockDiv.addEventListener('click', handleHardBlockClick);
             blockDiv.addEventListener('contextmenu', (e) => {
                 e.preventDefault();
                 handleNormalRightClick(blockDiv);
             });
         } else {
             blockDiv.addEventListener('click', handleEasyBlockClick);
+            blockDiv.addEventListener('contextmenu', (e) => {
+                e.preventDefault();
+                handleNormalRightClick(blockDiv);
+            });
         }
 
         blockContainer.appendChild(blockDiv);
@@ -178,6 +181,9 @@ function validateEasyMatch() {
                 frid = frid.filter(id => id !== commonPairId);
                 block.dataset.functionId = fid.join(',');
                 block.dataset.factorId = frid.join(',');
+                if (fid.length === 0 && frid.length === 0) {
+                    block.classList.add('matched');
+                }
             });
 
             gameState.activeSelection = [];
@@ -211,7 +217,7 @@ function validateEasyMatch() {
 // HARD MODE (multi-block chain rule matching)
 // ============================================================
 
-function handleNormalBlockClick(event) {
+function handleHardBlockClick(event) {
     if (gameState.isProcessing) return;
 
     const el = event.currentTarget;
@@ -226,11 +232,6 @@ function handleNormalBlockClick(event) {
     } else {
         const firstFunctionId = gameState.activeSelection[0].functionId;
         if (!elFactorId.includes(firstFunctionId)) return;
-        // No duplicate block texts in a match
-        const alreadySelected = gameState.activeSelection.some(sel =>
-            sel.latex === el.dataset.latex
-        );
-        if (alreadySelected) return;
     }
 
     el.classList.add('is-selected');
@@ -263,16 +264,37 @@ function handleNormalRightClick(el) {
     if (gameState.isProcessing) return;
     if (gameState.activeSelection.length === 0) return;
 
-    const lastSelection = gameState.activeSelection[gameState.activeSelection.length - 1];
-    if (lastSelection.element === el) {
+    const idx = gameState.activeSelection.findIndex(sel => sel.element === el);
+    if (idx !== -1) {
+        gameState.activeSelection.splice(idx, 1);
         el.classList.remove('is-selected', 'selected-function', 'selected-derivative');
         el.style.pointerEvents = 'auto';
-        gameState.activeSelection.pop();
         updateEquationBar();
     }
 }
 
 function validateHardMatch() {
+    const functionId = gameState.activeSelection[0].functionId;
+    const allMatch = gameState.activeSelection.every(sel => sel.functionId === functionId);
+    if (!allMatch) {
+        // Defensive guard: should never trigger with pre-filters, but catch bugs
+        gameState.activeSelection.forEach(sel => {
+            if (sel.element) sel.element.classList.add('error');
+        });
+        gameState.timeLeft = Math.max(0, gameState.timeLeft - 5);
+        updateUI();
+        setTimeout(() => {
+            gameState.activeSelection.forEach(sel => {
+                sel.element.classList.remove('is-selected', 'selected-function', 'selected-derivative', 'error');
+                sel.element.style.pointerEvents = 'auto';
+            });
+            gameState.activeSelection = [];
+            gameState.isProcessing = false;
+            updateEquationBar();
+        }, 450);
+        return;
+    }
+
     gameState.activeSelection.forEach(sel => {
         if (sel.element) sel.element.classList.add('match-success');
     });
@@ -294,6 +316,9 @@ function validateHardMatch() {
             frid = frid.filter(id => id !== matchedPairId);
             block.dataset.functionId = fid.join(',');
             block.dataset.factorId = frid.join(',');
+            if (fid.length === 0 && frid.length === 0) {
+                block.classList.add('matched');
+            }
         });
 
         gameState.activeSelection = [];
@@ -366,7 +391,6 @@ function clearEquationForce() {
     });
     gameState.activeSelection = [];
     activeEquation.innerHTML = '';
-    submitBtn.style.display = 'none';
     renderMathJax();
 }
 
@@ -377,6 +401,8 @@ function clearEquationForce() {
 function renderMathJax() {
     if (typeof MathJax !== 'undefined') {
         MathJax.typesetPromise().catch(err => console.error('MathJax rendering failed:', err));
+    } else {
+        console.warn('MathJax not loaded — LaTeX may display as raw text');
     }
 }
 

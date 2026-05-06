@@ -4,6 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>DerivaMatch</title>
+    <link rel="icon" href="data:,">
     <link rel="stylesheet" href="style.css">
     <script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
 </head>
@@ -41,7 +42,6 @@
             <h3>Active Equation:</h3>
             <div id="active-equation" class="active-equation"></div>
             <button id="clear-equation" onclick="clearEquation()">Clear</button>
-            <button id="submit" onclick="submitMatch()" style="display:none;">Submit</button>
         </div>
 
         <main class="game-board">
@@ -53,13 +53,6 @@
             <div id="operator-container" class="operator-container"></div>
         </aside>
 
-        <div id="success-modal" class="modal hidden">
-            <div class="modal-content">
-                <h2>Match Found!</h2>
-                <p id="match-message"></p>
-                <button onclick="closeModal()">Continue</button>
-            </div>
-        </div>
     </div>
 
     <script src="game.js"></script>
