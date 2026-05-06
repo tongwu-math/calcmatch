@@ -91,11 +91,11 @@ function renderBlocks() {
         blockDiv.dataset.latex = block.text;
         blockDiv.dataset.expectedParts = block.expected_parts;
 
-        if (block.pair_ids) {
-            blockDiv.dataset.pairIds = block.pair_ids.join(',');
+        if (block.function_id && block.function_id.length > 0) {
+            blockDiv.dataset.functionId = block.function_id.join(',');
         }
-        if (block.can_be_function) {
-            blockDiv.dataset.canBeFunction = 'true';
+        if (block.factor_id && block.factor_id.length > 0) {
+            blockDiv.dataset.factorId = block.factor_id.join(',');
         }
 
         if (gameState.currentMode === 'hard') {
@@ -135,9 +135,13 @@ function handleEasyBlockClick(event) {
         el.classList.add('selected-derivative');
     }
 
+    const elFunctionId = (el.dataset.functionId || '').split(',').map(s => parseInt(s)).filter(n => !isNaN(n));
+    const elFactorId = (el.dataset.factorId || '').split(',').map(s => parseInt(s)).filter(n => !isNaN(n));
+
     gameState.activeSelection.push({
         element: el,
-        pairIds: el.dataset.pairIds.split(',').map(Number),
+        functionId: elFunctionId,
+        factorId: elFactorId,
         latex: el.dataset.latex,
         blockType: blockType
     });
@@ -153,7 +157,8 @@ function handleEasyBlockClick(event) {
 function validateEasyMatch() {
     const first = gameState.activeSelection[0];
     const second = gameState.activeSelection[1];
-    const commonPairId = first.pairIds.find(id => second.pairIds.includes(id));
+    const commonPairId = first.functionId.find(id => second.factorId.includes(id))
+        ?? second.functionId.find(id => first.factorId.includes(id));
 
     if (commonPairId !== undefined) {
         first.element.classList.add('match-success');
@@ -165,6 +170,16 @@ function validateEasyMatch() {
         setTimeout(() => {
             first.element.classList.add('matched');
             second.element.classList.add('matched');
+
+            document.querySelectorAll('.block:not(.matched)').forEach(block => {
+                let fid = (block.dataset.functionId || '').split(',').map(s => parseInt(s)).filter(n => !isNaN(n));
+                let frid = (block.dataset.factorId || '').split(',').map(s => parseInt(s)).filter(n => !isNaN(n));
+                fid = fid.filter(id => id !== commonPairId);
+                frid = frid.filter(id => id !== commonPairId);
+                block.dataset.functionId = fid.join(',');
+                block.dataset.factorId = frid.join(',');
+            });
+
             gameState.activeSelection = [];
             gameState.isProcessing = false;
             updateEquationBar();
@@ -203,22 +218,19 @@ function handleNormalBlockClick(event) {
     if (el.classList.contains('is-selected')) return;
 
     const blockType = el.dataset.blockType;
-    const elPairIds = el.dataset.pairIds.split(',').map(Number);
-    const canBeFunction = el.dataset.canBeFunction === 'true';
+    const elFunctionId = (el.dataset.functionId || '').split(',').map(s => parseInt(s)).filter(n => !isNaN(n));
+    const elFactorId = (el.dataset.factorId || '').split(',').map(s => parseInt(s)).filter(n => !isNaN(n));
 
     if (gameState.activeSelection.length === 0) {
-        if (blockType !== 'function' && !canBeFunction) return;
+        if (elFunctionId.length === 0) return;
     } else {
-        const firstPairId = gameState.activeSelection[0].pairId;
-        if (!elPairIds.includes(firstPairId)) return;
-        // Hard mode: no duplicate derivative block texts
-        if (gameState.currentMode === 'hard' && blockType === 'derivative') {
-            const alreadySelected = gameState.activeSelection.some(sel =>
-                sel.blockType === 'derivative' && sel.latex === el.dataset.latex
-            );
-            if (alreadySelected) return;
-        }
-        if (gameState.currentMode !== 'hard' && blockType !== 'derivative') return;
+        const firstFunctionId = gameState.activeSelection[0].functionId;
+        if (!elFactorId.includes(firstFunctionId)) return;
+        // No duplicate block texts in a match
+        const alreadySelected = gameState.activeSelection.some(sel =>
+            sel.latex === el.dataset.latex
+        );
+        if (alreadySelected) return;
     }
 
     el.classList.add('is-selected');
@@ -232,7 +244,7 @@ function handleNormalBlockClick(event) {
 
     gameState.activeSelection.push({
         element: el,
-        pairId: gameState.activeSelection.length === 0 ? elPairIds[0] : gameState.activeSelection[0].pairId,
+        functionId: gameState.activeSelection.length === 0 ? elFunctionId[0] : gameState.activeSelection[0].functionId,
         latex: el.dataset.latex,
         blockType: blockType,
         expected_parts: el.dataset.expectedParts
@@ -269,9 +281,21 @@ function validateHardMatch() {
     updateUI();
 
     setTimeout(() => {
+        const matchedPairId = gameState.activeSelection[0].functionId;
+
         gameState.activeSelection.forEach(sel => {
             if (sel.element) sel.element.classList.add('matched');
         });
+
+        document.querySelectorAll('.block:not(.matched)').forEach(block => {
+            let fid = (block.dataset.functionId || '').split(',').map(s => parseInt(s)).filter(n => !isNaN(n));
+            let frid = (block.dataset.factorId || '').split(',').map(s => parseInt(s)).filter(n => !isNaN(n));
+            fid = fid.filter(id => id !== matchedPairId);
+            frid = frid.filter(id => id !== matchedPairId);
+            block.dataset.functionId = fid.join(',');
+            block.dataset.factorId = frid.join(',');
+        });
+
         gameState.activeSelection = [];
         gameState.isProcessing = false;
         updateEquationBar();
@@ -288,35 +312,38 @@ function validateHardMatch() {
 
 function updateEquationBar() {
     activeEquation.innerHTML = '';
-    const hasFunction = gameState.activeSelection.some(sel => sel.blockType === 'function');
 
-    if (hasFunction && gameState.currentMode === 'hard') {
-        const funcSel = gameState.activeSelection.find(sel => sel.blockType === 'function');
-        const funcSpan = document.createElement('span');
-        funcSpan.innerHTML = `\\( \\left( ${funcSel.latex} \\right)' = \\)`;
-        funcSpan.className = 'equation-item function';
-        activeEquation.appendChild(funcSpan);
+    if (gameState.activeSelection.length > 0) {
+        const funcSel = gameState.activeSelection.find(sel =>
+            sel.functionId !== undefined &&
+            (typeof sel.functionId === 'number' || sel.functionId.length > 0)
+        );
+        if (funcSel) {
+            const funcSpan = document.createElement('span');
+            funcSpan.innerHTML = `\\( \\left( ${funcSel.latex} \\right)' = \\)`;
+            funcSpan.className = 'equation-item function';
+            activeEquation.appendChild(funcSpan);
 
-        const factors = gameState.activeSelection.filter(sel => sel.blockType === 'derivative');
-        factors.forEach((sel, idx) => {
-            if (idx > 0) {
-                const dot = document.createElement('span');
-                dot.innerHTML = `\\( \\cdot \\)`;
-                dot.className = 'equation-item operator';
-                activeEquation.appendChild(dot);
-            }
-            const span = document.createElement('span');
-            span.innerHTML = `\\( ${sel.latex} \\)`;
-            span.className = 'equation-item derivative';
-            activeEquation.appendChild(span);
-        });
-    } else {
-        gameState.activeSelection.forEach(sel => {
-            const span = document.createElement('span');
-            span.innerHTML = `\\( ${sel.latex} \\)`;
-            span.className = `equation-item ${sel.blockType}`;
-            activeEquation.appendChild(span);
-        });
+            gameState.activeSelection.filter(sel => sel !== funcSel).forEach((sel, idx) => {
+                if (idx > 0) {
+                    const dot = document.createElement('span');
+                    dot.innerHTML = `\\( \\cdot \\)`;
+                    dot.className = 'equation-item operator';
+                    activeEquation.appendChild(dot);
+                }
+                const span = document.createElement('span');
+                span.innerHTML = `\\( ${sel.latex} \\)`;
+                span.className = 'equation-item derivative';
+                activeEquation.appendChild(span);
+            });
+        } else {
+            gameState.activeSelection.forEach(sel => {
+                const span = document.createElement('span');
+                span.innerHTML = `\\( ${sel.latex} \\)`;
+                span.className = `equation-item ${sel.blockType}`;
+                activeEquation.appendChild(span);
+            });
+        }
     }
     renderMathJax();
 }

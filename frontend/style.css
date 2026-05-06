@@ -74,7 +74,7 @@ body {
     font-size: 1.5rem;
     font-weight: bold;
     color: #e8eaed;
-    height: 50px;
+    height: 80px;
     display: flex;
     align-items: center;
     justify-content: center;
@@ -83,7 +83,6 @@ body {
     padding: 10px;
     border-radius: 5px;
     background: rgba(45, 53, 72, 0.5);
-    overflow: hidden;
 }
 
 .equation-bar button {

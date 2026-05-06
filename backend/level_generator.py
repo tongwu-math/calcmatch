@@ -107,12 +107,12 @@ def generate_level(mode):
 
     # --- Easy mode: one-to-one matching ---
     if mode == "easy":
-        selected_pairs = random.sample(easy_pairs, 10)
+        selected_pairs = random.sample(easy_pairs, 9)
         return _build_one_to_one(selected_pairs, 2)
 
     # --- Normal mode: product/quotient, one-to-one matching ---
     elif mode == "normal":
-        selected_pairs = random.sample(normal_pairs, min(8, len(normal_pairs)))
+        selected_pairs = random.sample(normal_pairs, min(9, len(normal_pairs)))
         return _build_one_to_one(selected_pairs, 2)
 
     # --- Hard mode: chain rule, multi-block factor matching ---
@@ -124,18 +124,19 @@ def generate_level(mode):
         total = 0
         for p in remaining:
             pair_total = 1 + len(p["factors"])
-            if total + pair_total > 28:
+            if total + pair_total > 18:
                 continue
             selected.append(p)
             total += pair_total
-            if total >= 16:
+            if total >= 18:
                 break
 
         blocks = []
 
         for p in selected:
             blocks.append({
-                "pair_ids": [p["pair_id"]],
+                "function_id": [p["pair_id"]],
+                "factor_id": [],
                 "text": p["function"],
                 "type": "function",
                 "expected_parts": p["expected_parts"]
@@ -158,25 +159,27 @@ def generate_level(mode):
             count = text_counts[text]
             for _ in range(count):
                 blocks.append({
-                    "pair_ids": pids,
+                    "function_id": [],
+                    "factor_id": pids,
                     "text": text,
                     "type": "derivative",
                     "expected_parts": 3
                 })
 
-        # Merge pair_ids for blocks with identical text (regardless of type)
+        # Merge function_id and factor_id for blocks with identical text
         from collections import defaultdict
-        text_to_pids = defaultdict(list)
-        text_has_function = {}
+        text_to_function_ids = defaultdict(list)
+        text_to_factor_ids = defaultdict(list)
         for b in blocks:
-            for pid in b["pair_ids"]:
-                if pid not in text_to_pids[b["text"]]:
-                    text_to_pids[b["text"]].append(pid)
-            if b["type"] == "function":
-                text_has_function[b["text"]] = True
+            for fid in b["function_id"]:
+                if fid not in text_to_function_ids[b["text"]]:
+                    text_to_function_ids[b["text"]].append(fid)
+            for fid in b["factor_id"]:
+                if fid not in text_to_factor_ids[b["text"]]:
+                    text_to_factor_ids[b["text"]].append(fid)
         for b in blocks:
-            b["pair_ids"] = sorted(text_to_pids[b["text"]])
-            b["can_be_function"] = text_has_function.get(b["text"], False)
+            b["function_id"] = sorted(text_to_function_ids[b["text"]])
+            b["factor_id"] = sorted(text_to_factor_ids[b["text"]])
 
         random.shuffle(blocks)
         return {"blocks": blocks, "operators": []}
@@ -189,7 +192,8 @@ def _build_one_to_one(pairs, expected_parts):
     blocks = []
     for pair in pairs:
         blocks.append({
-            "pair_ids": [pair["pair_id"]],
+            "function_id": [pair["pair_id"]],
+            "factor_id": [],
             "text": pair["function"],
             "type": "function",
             "expected_parts": expected_parts
@@ -211,25 +215,27 @@ def _build_one_to_one(pairs, expected_parts):
         count = text_counts[text]
         for _ in range(count):
             blocks.append({
-                "pair_ids": pids,
+                "function_id": [],
+                "factor_id": pids,
                 "text": text,
                 "type": "derivative",
                 "expected_parts": expected_parts
             })
 
-    # Merge pair_ids for blocks with identical text (regardless of type)
+    # Merge function_id and factor_id for blocks with identical text
     from collections import defaultdict
-    text_to_pids = defaultdict(list)
-    text_has_function = {}
+    text_to_function_ids = defaultdict(list)
+    text_to_factor_ids = defaultdict(list)
     for b in blocks:
-        for pid in b["pair_ids"]:
-            if pid not in text_to_pids[b["text"]]:
-                text_to_pids[b["text"]].append(pid)
-        if b["type"] == "function":
-            text_has_function[b["text"]] = True
+        for fid in b["function_id"]:
+            if fid not in text_to_function_ids[b["text"]]:
+                text_to_function_ids[b["text"]].append(fid)
+        for fid in b["factor_id"]:
+            if fid not in text_to_factor_ids[b["text"]]:
+                text_to_factor_ids[b["text"]].append(fid)
     for b in blocks:
-        b["pair_ids"] = sorted(text_to_pids[b["text"]])
-        b["can_be_function"] = text_has_function.get(b["text"], False)
+        b["function_id"] = sorted(text_to_function_ids[b["text"]])
+        b["factor_id"] = sorted(text_to_factor_ids[b["text"]])
 
     random.shuffle(blocks)
     return {"blocks": blocks, "operators": []}
