@@ -211,7 +211,13 @@ function handleNormalBlockClick(event) {
     } else {
         const firstPairId = gameState.activeSelection[0].pairId;
         if (!elPairIds.includes(firstPairId)) return;
-        // Normal mode: only derivative blocks. Hard mode: any type if pairId matches.
+        // Hard mode: no duplicate derivative block texts
+        if (gameState.currentMode === 'hard' && blockType === 'derivative') {
+            const alreadySelected = gameState.activeSelection.some(sel =>
+                sel.blockType === 'derivative' && sel.latex === el.dataset.latex
+            );
+            if (alreadySelected) return;
+        }
         if (gameState.currentMode !== 'hard' && blockType !== 'derivative') return;
     }
 
