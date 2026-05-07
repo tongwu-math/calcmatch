@@ -3,20 +3,31 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>DerivaMatch</title>
+    <title>CalcMatch</title>
     <link rel="icon" href="data:,">
     <link rel="stylesheet" href="style.css">
     <script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
 </head>
 <body>
-    <!-- Level Selection Overlay -->
-    <div id="level-overlay" class="overlay">
+    <!-- Game Selection Overlay -->
+    <div id="game-overlay" class="overlay">
         <div class="overlay-content">
-            <h1>DerivaMatch</h1>
+            <h1>CalcMatch</h1>
+            <p>Pick a game:</p>
+            <button class="level-btn game-deriva-btn" onclick="selectGame('deriva')">DerivaMatch<br><small>Derivatives: d/dx</small></button>
+            <button class="level-btn game-integra-btn" onclick="selectGame('integra')">IntegraMatch<br><small>Antiderivatives: &#8747; dx</small></button>
+        </div>
+    </div>
+
+    <!-- Level Selection Overlay -->
+    <div id="level-overlay" class="overlay hidden">
+        <div class="overlay-content">
+            <h1 id="level-game-title">DerivaMatch</h1>
             <p>Select your level:</p>
-            <button class="level-btn easy-btn" onclick="selectLevel('easy')">Easy<br><small>Basic Derivatives</small></button>
-            <button class="level-btn normal-btn" onclick="selectLevel('normal')">Normal<br><small>Product &amp; Quotient Rules</small></button>
-            <button class="level-btn hard-btn" onclick="selectLevel('hard')">Hard<br><small>Chain Rule</small></button>
+            <button class="level-btn easy-btn" onclick="selectLevel('easy')">Easy<br><small id="easy-desc">Basic Derivatives</small></button>
+            <button class="level-btn normal-btn" onclick="selectLevel('normal')">Normal<br><small id="normal-desc">Product &amp; Quotient Rules</small></button>
+            <button class="level-btn hard-btn" onclick="selectLevel('hard')">Hard<br><small id="hard-desc">Chain Rule</small></button>
+            <button class="level-btn back-btn" onclick="backToGameSelect()">Back</button>
         </div>
     </div>
 
@@ -27,6 +38,7 @@
             <p id="result-score"></p>
             <button class="level-btn" onclick="replayLevel()">Replay</button>
             <button class="level-btn" onclick="showLevelSelect()">Change Level</button>
+            <button class="level-btn" onclick="showGameSelect()">Change Game</button>
         </div>
     </div>
 
@@ -39,7 +51,7 @@
         </header>
 
         <div class="equation-bar">
-            <h3>Active Equation:</h3>
+            <h3 id="equation-title">Active Equation:</h3>
             <div id="active-equation" class="active-equation"></div>
             <button id="clear-equation" onclick="clearEquation()">Clear</button>
         </div>
@@ -47,12 +59,6 @@
         <main class="game-board">
             <div id="block-container" class="block-container"></div>
         </main>
-
-        <aside class="operator-panel" id="operator-panel" style="display:none;">
-            <h3>Operators &amp; Constants</h3>
-            <div id="operator-container" class="operator-container"></div>
-        </aside>
-
     </div>
 
     <script src="game.js"></script>
