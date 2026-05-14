@@ -43,7 +43,7 @@ def generate_level(mode):
     # Block 2 (uv):  uv                -- the boundary term
     # Block 3 (vup): integral u'v dx   -- the remaining integral (UNSOLVED)
     hard_pairs = [
-        {"pair_id": 1, "uvp": "x \\sin(x)", "uv": "-x \\cos(x)", "vup": "\\cos(x)"},
+        {"pair_id": 1, "uvp": "x \\sin(x)", "uv": "-x \\cos(x)", "vup": "-\\cos(x)"},
         {"pair_id": 2, "uvp": "x e^x", "uv": "x e^x", "vup": "e^x"},
         {"pair_id": 3, "uvp": "x \\cos(x)", "uv": "x \\sin(x)", "vup": "\\sin(x)"},
         {"pair_id": 4, "uvp": "\\ln(x)", "uv": "x \\ln(x)", "vup": "1"},
@@ -68,7 +68,7 @@ def generate_level(mode):
         total = 0
         for p in remaining:
             pair_total = 3
-            if total + pair_total > 28:
+            if total + pair_total > 18:
                 continue
             selected.append(p)
             total += pair_total
@@ -83,7 +83,7 @@ def generate_level(mode):
         total = 0
         for p in remaining:
             pair_total = 3
-            if total + pair_total > 28:
+            if total + pair_total > 18:
                 continue
             selected.append(p)
             total += pair_total

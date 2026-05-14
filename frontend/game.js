@@ -99,11 +99,11 @@ function showResult(passed) {
 
 function startNewGame() {
     clearEquationForce();
-    blockContainer.innerHTML = '';
+    blockContainer.innerHTML = '<div class="loading-msg">Loading…</div>';
     gameState.activeSelection = [];
     gameState.score = 0;
     gameState.timeLeft = 60;
-    gameState.isProcessing = false;
+    gameState.isProcessing = true;
     gameState.blockUid = 0;
     updateUI();
 
@@ -111,11 +111,16 @@ function startNewGame() {
         .then(function(response) { return response.json(); })
         .then(function(data) {
             gameState.levelData = data;
+            gameState.isProcessing = false;
             renderBlocks();
             updateUI();
             startTimer();
         })
-        .catch(function(error) { console.error('Error fetching level data:', error); });
+        .catch(function(error) {
+            console.error('Error fetching level data:', error);
+            gameState.isProcessing = false;
+            blockContainer.innerHTML = '<div class="loading-msg">Failed to load level — please try again.</div>';
+        });
 }
 
 function renderBlocks() {
@@ -213,10 +218,9 @@ function handleDerivaEasyClick(event) {
     if (gameState.isProcessing) return;
     if (gameState.activeSelection.length >= 2) return;
     var el = event.currentTarget;
-    if (el.classList.contains('is-selected')) return;
+    if (el.classList.contains('is-selected')) { handleRightClick(el); return; }
 
     el.classList.add('is-selected');
-    el.style.pointerEvents = 'none';
 
     var bt = el.dataset.blockType;
     if (bt === 'function') el.classList.add('selected-function');
@@ -269,7 +273,7 @@ function validateDerivaEasy() {
 function handleDerivaHardClick(event) {
     if (gameState.isProcessing) return;
     var el = event.currentTarget;
-    if (el.classList.contains('is-selected')) return;
+    if (el.classList.contains('is-selected')) { handleRightClick(el); return; }
 
     var eFid = parseIds(el, 'functionId');
     var eFrid = parseIds(el, 'factorId');
@@ -277,7 +281,7 @@ function handleDerivaHardClick(event) {
     if (gameState.activeSelection.length === 0) { if (eFid.length === 0) return; }
     else { if (!eFrid.includes(gameState.activeSelection[0].functionId)) return; }
 
-    el.classList.add('is-selected'); el.style.pointerEvents = 'none';
+    el.classList.add('is-selected');
     var bt = el.dataset.blockType;
     if (bt === 'function') el.classList.add('selected-function');
     else if (bt === 'derivative') el.classList.add('selected-derivative');
@@ -326,9 +330,9 @@ function handleIntegraEasyClick(event) {
     if (gameState.isProcessing) return;
     if (gameState.activeSelection.length >= 2) return;
     var el = event.currentTarget;
-    if (el.classList.contains('is-selected')) return;
+    if (el.classList.contains('is-selected')) { handleRightClick(el); return; }
 
-    el.classList.add('is-selected'); el.style.pointerEvents = 'none';
+    el.classList.add('is-selected');
     var bt = el.dataset.blockType;
     if (bt === 'function') el.classList.add('selected-function');
     else if (bt === 'antiderivative') el.classList.add('selected-antiderivative');
@@ -377,7 +381,7 @@ function validateIntegraEasy() {
 function handleIntegraMultiClick(event) {
     if (gameState.isProcessing) return;
     var el = event.currentTarget;
-    if (el.classList.contains('is-selected')) return;
+    if (el.classList.contains('is-selected')) { handleRightClick(el); return; }
 
     var ids = {
         preusubId: parseIds(el, 'preusubId'),
@@ -406,18 +410,18 @@ function handleIntegraMultiClick(event) {
             if (!ids.postusubId.includes(pid)) return;
         }
     } else {
-        var fids = gameState.activeSelection[0].ids;
-        var hasCommon = ids.uvpId.concat(ids.uvId).concat(ids.vupId).some(function(id) {
+        fids = gameState.activeSelection[0].ids;
+        hasCommon = ids.uvpId.concat(ids.uvId).concat(ids.vupId).some(function(id) {
             return fids.uvpId.concat(fids.uvId).concat(fids.vupId).includes(id);
         });
         if (!hasCommon) return;
-        var pid = gameState.activeSelection[0].pairId;
+        pid = gameState.activeSelection[0].pairId;
         if (ids.uvpId.includes(pid) && gameState.activeSelection.some(function(s) { return s.ids.uvpId.includes(pid); })) return;
         if (ids.uvId.includes(pid) && gameState.activeSelection.some(function(s) { return s.ids.uvId.includes(pid); })) return;
         if (ids.vupId.includes(pid) && gameState.activeSelection.some(function(s) { return s.ids.vupId.includes(pid); })) return;
     }
 
-    el.classList.add('is-selected'); el.style.pointerEvents = 'none';
+    el.classList.add('is-selected');
     var bt = el.dataset.blockType;
     if (bt === 'function') el.classList.add('selected-function');
     else if (bt === 'antiderivative') el.classList.add('selected-antiderivative');
@@ -586,16 +590,17 @@ function updateEquationBar() {
                 funcSpan.className = 'equation-item function';
                 activeEquation.appendChild(funcSpan);
 
-                var arrow = document.createElement('span');
-                arrow.innerHTML = '\\( \\to \\)';
-                arrow.className = 'equation-item operator';
-                activeEquation.appendChild(arrow);
-
                 var others = gameState.activeSelection.filter(function(sel) { return sel !== funcSel; });
+                if (others.length > 0) {
+                    var eq = document.createElement('span');
+                    eq.innerHTML = '\\( = \\)';
+                    eq.className = 'equation-item operator';
+                    activeEquation.appendChild(eq);
+                }
                 others.forEach(function(sel, idx) {
                     if (idx > 0) {
                         var sep = document.createElement('span');
-                        sep.innerHTML = '\\( \\to \\)';
+                        sep.innerHTML = '\\( = \\)';
                         sep.className = 'equation-item operator';
                         activeEquation.appendChild(sep);
                     }
@@ -676,10 +681,11 @@ function clearEquationForce() {
 // ============================================================
 
 function renderMathJax() {
-    if (typeof MathJax !== 'undefined') {
-        MathJax.typesetPromise().catch(function(err) { console.error('MathJax rendering failed:', err); });
-    } else {
-        console.warn('MathJax not loaded - LaTeX may display as raw text');
+    if (typeof renderMathInElement !== 'undefined') {
+        renderMathInElement(document.body, {
+            delimiters: [{left: '\\(', right: '\\)', display: false}],
+            throwOnError: false
+        });
     }
 }
 
@@ -690,7 +696,7 @@ function renderMathJax() {
 function startTimer() {
     if (gameState.timer) clearInterval(gameState.timer);
     gameState.timer = setInterval(function() {
-        gameState.timeLeft--;
+        gameState.timeLeft = Math.max(0, gameState.timeLeft - 1);
         updateUI();
         if (gameState.timeLeft <= 0) {
             clearInterval(gameState.timer);
