@@ -164,10 +164,9 @@ body.game-integra .block.selected-function {
     box-shadow: 0 0 12px rgba(255, 190, 80, 0.25);
 }
 
+/* Selected blocks stay clickable: re-click (or right-click) deselects. */
 .block.is-selected {
-    pointer-events: none;
     opacity: 0.7;
-    cursor: default;
 }
 
 .block.error {
@@ -317,6 +316,14 @@ body.game-integra .normal-btn:hover {
     background: rgba(100, 180, 220, 0.5);
 }
 
+.quotient-btn {
+    background: rgba(120, 90, 200, 0.3);
+}
+.quotient-btn:hover {
+    background: rgba(120, 90, 200, 0.5);
+    transform: translateY(-1px);
+}
+
 .hard-btn {
     background: rgba(220, 70, 60, 0.3);
 }
@@ -377,3 +384,4 @@ body.game-integra .hard-btn:hover {
 .back-btn:hover {
     background: rgba(100, 100, 120, 0.7);
 }
+

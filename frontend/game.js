@@ -2,6 +2,7 @@
 let gameState = {
     currentGame: null,
     currentMode: null,
+    difficulty: null,
     levelData: null,
     activeSelection: [],
     score: 0,
@@ -23,15 +24,51 @@ const resultOverlay = document.getElementById('result-overlay');
 const resultTitle = document.getElementById('result-title');
 const resultScore = document.getElementById('result-score');
 const levelGameTitle = document.getElementById('level-game-title');
-const easyDesc = document.getElementById('easy-desc');
-const normalDesc = document.getElementById('normal-desc');
-const hardDesc = document.getElementById('hard-desc');
+const levelButtons = document.getElementById('level-buttons');
 const equationTitle = document.getElementById('equation-title');
+const configOverlay = document.getElementById('config-overlay');
+const configTitle = document.getElementById('config-title');
+const presetHardBtn = document.getElementById('preset-hard');
 
-const LEVEL_DESCS = {
-    deriva: { easy: 'Basic Derivatives', normal: 'Product & Quotient Rules', hard: 'Chain Rule' },
-    integra: { easy: 'Basic Antiderivatives', normal: 'u-Substitution', hard: 'Integration by Parts' }
+// Mode list per game. `config: true` opens the difficulty/function-type step.
+const MODES = {
+    deriva: [
+        { key: 'basic', title: 'Basic', desc: 'Single-function derivatives', btnClass: 'easy-btn', config: true },
+        { key: 'product', title: 'Product Rule', desc: '(f · g)′', btnClass: 'normal-btn', config: true },
+        { key: 'quotient', title: 'Quotient Rule', desc: '(f / g)′', btnClass: 'quotient-btn', config: true },
+        { key: 'chain', title: 'Chain Rule', desc: 'f(g(x))′', btnClass: 'hard-btn', config: false }
+    ],
+    integra: [
+        { key: 'easy', title: 'Basic', desc: 'Basic Antiderivatives', btnClass: 'easy-btn', config: true },
+        { key: 'normal', title: 'u-Substitution', desc: 'u-Substitution', btnClass: 'normal-btn', config: false },
+        { key: 'hard', title: 'Integration by Parts', desc: 'Integration by Parts', btnClass: 'hard-btn', config: false }
+    ]
 };
+
+function modeDef(game, mode) {
+    return MODES[game].find(function(m) { return m.key === mode; });
+}
+
+function modeTitle(game, mode) {
+    var m = modeDef(game, mode);
+    return m ? m.title : mode;
+}
+
+function modeSupportsConfig(game, mode) {
+    var m = modeDef(game, mode);
+    return !!(m && m.config);
+}
+
+function renderLevelButtons(game) {
+    levelButtons.innerHTML = '';
+    MODES[game].forEach(function(m) {
+        var b = document.createElement('button');
+        b.className = 'level-btn ' + m.btnClass;
+        b.onclick = function() { selectLevel(m.key); };
+        b.innerHTML = m.title + '<br><small>' + m.desc + '</small>';
+        levelButtons.appendChild(b);
+    });
+}
 
 
 // ============================================================
@@ -42,9 +79,7 @@ function selectGame(game) {
     gameState.currentGame = game;
     document.body.className = 'game-' + game;
     levelGameTitle.textContent = game === 'deriva' ? 'DerivaMatch' : 'IntegraMatch';
-    easyDesc.textContent = LEVEL_DESCS[game].easy;
-    normalDesc.textContent = LEVEL_DESCS[game].normal;
-    hardDesc.textContent = LEVEL_DESCS[game].hard;
+    renderLevelButtons(game);
     gameOverlay.classList.add('hidden');
     levelOverlay.classList.remove('hidden');
 }
@@ -56,9 +91,31 @@ function backToGameSelect() {
 
 function selectLevel(mode) {
     gameState.currentMode = mode;
+    gameState.difficulty = null;
+
+    if (modeSupportsConfig(gameState.currentGame, mode)) {
+        levelOverlay.classList.add('hidden');
+        configTitle.textContent = modeTitle(gameState.currentGame, mode);
+        // IntegraMatch Basic has no 'hard' tier — hide that preset.
+        presetHardBtn.style.display = gameState.currentGame === 'integra' ? 'none' : 'block';
+        configOverlay.classList.remove('hidden');
+        return;
+    }
+    beginGame();
+}
+
+function startWithPreset(diff) {
+    gameState.difficulty = diff;
+    beginGame();
+}
+
+function beginGame() {
     levelOverlay.classList.add('hidden');
+    configOverlay.classList.add('hidden');
     const g = gameState.currentGame === 'deriva' ? 'Deriva' : 'Integra';
-    levelLabel.textContent = g + ' - ' + (mode === 'easy' ? 'Easy' : mode === 'normal' ? 'Normal' : 'Hard');
+    var diffLabel = { easy: 'Easy', normal: 'Normal', hard: 'Hard' };
+    var suffix = gameState.difficulty ? ' · ' + diffLabel[gameState.difficulty] : '';
+    levelLabel.textContent = g + ' - ' + modeTitle(gameState.currentGame, gameState.currentMode) + suffix;
     equationTitle.textContent = gameState.currentGame === 'deriva' ? 'Active Equation:' : 'Active Integration:';
     startNewGame();
 }
@@ -68,6 +125,7 @@ function showGameSelect() {
     gameState.isProcessing = false;
     resultOverlay.classList.add('hidden');
     levelOverlay.classList.add('hidden');
+    configOverlay.classList.add('hidden');
     gameOverlay.classList.remove('hidden');
 }
 
@@ -75,6 +133,7 @@ function showLevelSelect() {
     clearInterval(gameState.timer);
     gameState.isProcessing = false;
     resultOverlay.classList.add('hidden');
+    configOverlay.classList.add('hidden');
     levelOverlay.classList.remove('hidden');
 }
 
@@ -107,7 +166,10 @@ function startNewGame() {
     gameState.blockUid = 0;
     updateUI();
 
-    fetch('/api/get_level_data?game=' + gameState.currentGame + '&mode=' + gameState.currentMode)
+    var url = '/api/get_level_data?game=' + gameState.currentGame + '&mode=' + gameState.currentMode;
+    if (gameState.difficulty) url += '&difficulty=' + gameState.difficulty;
+
+    fetch(url)
         .then(function(response) { return response.json(); })
         .then(function(data) {
             gameState.levelData = data;
@@ -148,7 +210,7 @@ function renderBlocks() {
 
         var clickHandler;
         if (gameState.currentGame === 'deriva') {
-            clickHandler = gameState.currentMode === 'hard' ? handleDerivaHardClick : handleDerivaEasyClick;
+            clickHandler = gameState.currentMode === 'chain' ? handleDerivaHardClick : handleDerivaEasyClick;
         } else {
             clickHandler = gameState.currentMode === 'easy' ? handleIntegraEasyClick : handleIntegraMultiClick;
         }
@@ -174,12 +236,17 @@ function handleRightClick(el) {
     if (gameState.isProcessing) return;
     if (gameState.activeSelection.length === 0) return;
     var idx = gameState.activeSelection.findIndex(function(sel) { return sel.element === el; });
-    if (idx !== -1) {
-        gameState.activeSelection.splice(idx, 1);
-        el.classList.remove('is-selected', 'selected-function', 'selected-derivative', 'selected-antiderivative');
-        el.style.pointerEvents = 'auto';
-        updateEquationBar();
+    if (idx === -1) return;
+    // Deselecting the anchor (1st click) invalidates the roles of every later pick —
+    // in u-sub the role checks are positional, so keeping the tail would allow a
+    // two-u-block "match" that consumes shared blocks and can soft-lock the board.
+    if (idx === 0 && gameState.activeSelection.length > 1) {
+        clearEquationForce();
+        return;
     }
+    gameState.activeSelection.splice(idx, 1);
+    el.classList.remove('is-selected', 'selected-function', 'selected-derivative', 'selected-antiderivative');
+    updateEquationBar();
 }
 
 function handleMismatch(sels, clearClasses) {
@@ -190,7 +257,6 @@ function handleMismatch(sels, clearClasses) {
         sels.forEach(function(sel) {
             if (sel.element) {
                 sel.element.classList.remove.apply(sel.element.classList, ['is-selected'].concat(clearClasses).concat(['error']));
-                sel.element.style.pointerEvents = 'auto';
             }
         });
         gameState.activeSelection = [];
@@ -201,6 +267,7 @@ function handleMismatch(sels, clearClasses) {
 
 function checkWin() {
     if (blockContainer.querySelectorAll('.block:not(.matched)').length === 0) {
+        clearInterval(gameState.timer); // stop now so the timer can't hit 0 during the delay
         setTimeout(function() { showResult(true); }, 300);
     }
 }
@@ -245,7 +312,7 @@ function validateDerivaEasy() {
 
     if (cid !== undefined) {
         a.element.classList.add('match-success'); b.element.classList.add('match-success');
-        gameState.score += gameState.currentMode === 'easy' ? 100 : 200;
+        gameState.score += gameState.currentMode === 'basic' ? 100 : 200;
         updateUI();
         setTimeout(function() {
             a.element.classList.add('matched'); b.element.classList.add('matched');
@@ -258,7 +325,8 @@ function validateDerivaEasy() {
                 bl.dataset.factorId = frid.join(',');
                 if (fid.length === 0 && frid.length === 0) bl.classList.add('matched');
             });
-            gameState.activeSelection = []; gameState.isProcessing = false; updateEquationBar(); checkWin();
+            // Keep the completed equation on the bar until the next click re-renders it.
+            gameState.activeSelection = []; gameState.isProcessing = false; checkWin();
         }, 350);
     } else {
         handleMismatch([a, b], ['selected-function', 'selected-derivative']);
@@ -277,12 +345,24 @@ function handleDerivaHardClick(event) {
 
     var eFid = parseIds(el, 'functionId');
     var eFrid = parseIds(el, 'factorId');
+    var bt = el.dataset.blockType;
 
-    if (gameState.activeSelection.length === 0) { if (eFid.length === 0) return; }
-    else { if (!eFrid.includes(gameState.activeSelection[0].functionId)) return; }
+    if (gameState.activeSelection.length === 0) {
+        // 1st click = the function: any block carrying a function_id. The role is decided by
+        // click order, not by a fixed type tag, so a block that is a function here and a
+        // factor elsewhere (e.g. cos(ln x)) stays fully interchangeable.
+        if (eFid.length === 0) return;
+    } else {
+        // 2nd & 3rd clicks = factors: must carry the function's id, and must not be identical
+        // to a factor already chosen. The function (index 0) is exempt, so a factor may equal
+        // the function's text — e.g. (e^{sec x})' = e^{sec x}·sec(x)tan(x) — while a shared
+        // factor such as 1/(2√x) or cos(ln x) can never be picked twice.
+        if (!eFrid.includes(gameState.activeSelection[0].functionId)) return;
+        var newLatex = el.dataset.latex;
+        if (gameState.activeSelection.slice(1).some(function(sel) { return sel.latex === newLatex; })) return;
+    }
 
     el.classList.add('is-selected');
-    var bt = el.dataset.blockType;
     if (bt === 'function') el.classList.add('selected-function');
     else if (bt === 'derivative') el.classList.add('selected-derivative');
 
@@ -317,7 +397,8 @@ function validateDerivaHard() {
             bl.dataset.factorId = fr.join(',');
             if (fi.length === 0 && fr.length === 0) bl.classList.add('matched');
         });
-        gameState.activeSelection = []; gameState.isProcessing = false; updateEquationBar(); checkWin();
+        // Keep the completed equation on the bar until the next click re-renders it.
+        gameState.activeSelection = []; gameState.isProcessing = false; checkWin();
     }, 350);
 }
 
@@ -366,7 +447,8 @@ function validateIntegraEasy() {
                 bl.dataset.intId = ii.join(',');
                 if (fi.length === 0 && ii.length === 0) bl.classList.add('matched');
             });
-            gameState.activeSelection = []; gameState.isProcessing = false; updateEquationBar(); checkWin();
+            // Keep the completed equation on the bar until the next click re-renders it.
+            gameState.activeSelection = []; gameState.isProcessing = false; checkWin();
         }, 350);
     } else {
         handleMismatch([a, b], ['selected-function', 'selected-antiderivative']);
@@ -467,7 +549,6 @@ function validateIntegraMulti() {
             gameState.activeSelection.forEach(function(sel) {
                 if (sel.element) {
                     sel.element.classList.remove('is-selected', 'selected-function', 'selected-antiderivative', 'error');
-                    sel.element.style.pointerEvents = 'auto';
                 }
             });
             gameState.activeSelection = [];
@@ -515,7 +596,7 @@ function validateIntegraMulti() {
 
         gameState.activeSelection = [];
         gameState.isProcessing = false;
-        updateEquationBar();
+        // Keep the completed equation on the bar until the next click re-renders it.
         checkWin();
     }, 350);
 }
@@ -535,11 +616,26 @@ function updateEquationBar() {
 
     if (gameState.currentGame === 'deriva') {
         var funcSel = null;
-        for (var si = 0; si < gameState.activeSelection.length; si++) {
-            var s = gameState.activeSelection[si];
-            if (s.functionId !== undefined && (typeof s.functionId === 'number' || s.functionId.length > 0)) {
-                funcSel = s;
-                break;
+        var derivSels = null;
+        if (gameState.currentMode === 'chain') {
+            // Chain: the anchor (1st click) is always the function.
+            funcSel = gameState.activeSelection[0];
+            derivSels = gameState.activeSelection.slice(1);
+        } else {
+            // One-to-one: a block can be a function in one pair and a derivative in
+            // another (e.g. cos(x)), so decide the direction by the actual id match,
+            // not by which block was clicked first.
+            var a = gameState.activeSelection[0];
+            var b = gameState.activeSelection.length > 1 ? gameState.activeSelection[1] : null;
+            if (b) {
+                if (a.functionId.some(function(id) { return b.factorId.includes(id); })) {
+                    funcSel = a; derivSels = [b];
+                } else if (b.functionId.some(function(id) { return a.factorId.includes(id); })) {
+                    funcSel = b; derivSels = [a];
+                }
+            } else if (a.functionId.length > 0 && a.factorId.length === 0) {
+                // Unambiguous function — safe to show "(f)' =" right away.
+                funcSel = a; derivSels = [];
             }
         }
         if (funcSel) {
@@ -548,7 +644,7 @@ function updateEquationBar() {
             funcSpan.className = 'equation-item function';
             activeEquation.appendChild(funcSpan);
 
-            gameState.activeSelection.filter(function(sel) { return sel !== funcSel; }).forEach(function(sel, idx) {
+            derivSels.forEach(function(sel, idx) {
                 if (idx > 0) {
                     var dot = document.createElement('span');
                     dot.innerHTML = '\\( \\cdot \\)';
@@ -570,12 +666,41 @@ function updateEquationBar() {
         }
     } else if (gameState.currentGame === 'integra') {
         if (gameState.currentMode === 'easy') {
-            gameState.activeSelection.forEach(function(sel) {
-                var span = document.createElement('span');
-                span.innerHTML = '\\( ' + sel.latex + ' \\)';
-                span.className = 'equation-item ' + sel.blockType;
-                activeEquation.appendChild(span);
-            });
+            // Show the pair as "∫ f dx = F". A block can be an integrand in one pair and
+            // an antiderivative in another (e.g. x^2), so decide the direction by the
+            // actual id match, like DerivaMatch one-to-one.
+            var ia = gameState.activeSelection[0];
+            var ib = gameState.activeSelection.length > 1 ? gameState.activeSelection[1] : null;
+            var integrandSel = null, antiSel = null;
+            if (ib) {
+                if (ia.funcId.some(function(id) { return ib.intId.includes(id); })) {
+                    integrandSel = ia; antiSel = ib;
+                } else if (ib.funcId.some(function(id) { return ia.intId.includes(id); })) {
+                    integrandSel = ib; antiSel = ia;
+                }
+            } else if (ia.funcId.length > 0 && ia.intId.length === 0) {
+                // Unambiguous integrand — safe to show "∫ f dx =" right away.
+                integrandSel = ia;
+            }
+            if (integrandSel) {
+                var intSpan = document.createElement('span');
+                intSpan.innerHTML = '\\( \\int ' + integrandSel.latex + ' \\,dx = \\)';
+                intSpan.className = 'equation-item function';
+                activeEquation.appendChild(intSpan);
+                if (antiSel) {
+                    var antiSpan = document.createElement('span');
+                    antiSpan.innerHTML = '\\( ' + antiSel.latex + ' \\)';
+                    antiSpan.className = 'equation-item antiderivative';
+                    activeEquation.appendChild(antiSpan);
+                }
+            } else {
+                gameState.activeSelection.forEach(function(sel) {
+                    var span = document.createElement('span');
+                    span.innerHTML = '\\( ' + sel.latex + ' \\)';
+                    span.className = 'equation-item ' + sel.blockType;
+                    activeEquation.appendChild(span);
+                });
+            }
         } else if (gameState.currentMode === 'normal') {
             var funcSel = null;
             for (var si = 0; si < gameState.activeSelection.length; si++) {
@@ -590,17 +715,18 @@ function updateEquationBar() {
                 funcSpan.className = 'equation-item function';
                 activeEquation.appendChild(funcSpan);
 
+                // u-sub steps are a transformation chain, not equalities: ∫f dx → u=g → ∫…du
                 var others = gameState.activeSelection.filter(function(sel) { return sel !== funcSel; });
                 if (others.length > 0) {
                     var eq = document.createElement('span');
-                    eq.innerHTML = '\\( = \\)';
+                    eq.innerHTML = '\\( \\rightarrow \\)';
                     eq.className = 'equation-item operator';
                     activeEquation.appendChild(eq);
                 }
                 others.forEach(function(sel, idx) {
                     if (idx > 0) {
                         var sep = document.createElement('span');
-                        sep.innerHTML = '\\( = \\)';
+                        sep.innerHTML = '\\( \\rightarrow \\)';
                         sep.className = 'equation-item operator';
                         activeEquation.appendChild(sep);
                     }
@@ -668,7 +794,6 @@ function clearEquationForce() {
     gameState.activeSelection.forEach(function(sel) {
         if (sel.element) {
             sel.element.classList.remove('is-selected', 'selected-function', 'selected-derivative', 'selected-antiderivative', 'error', 'match-success');
-            sel.element.style.pointerEvents = 'auto';
         }
     });
     gameState.activeSelection = [];

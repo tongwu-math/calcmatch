@@ -5,7 +5,13 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>CalcMatch</title>
     <link rel="icon" href="data:,">
-    <link rel="stylesheet" href="style.css">
+    <!-- Open the CDN connection early: saves DNS+TLS round trips on first load. -->
+    <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
+    <!-- Preload the two KaTeX fonts every board uses, so math paints without a font stall. -->
+    <link rel="preload" as="font" type="font/woff2" crossorigin href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/fonts/KaTeX_Main-Regular.woff2">
+    <link rel="preload" as="font" type="font/woff2" crossorigin href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/fonts/KaTeX_Math-Italic.woff2">
+    <!-- Bump ?v= on every deploy: assets are cached for 24h, the version busts the cache. -->
+    <link rel="stylesheet" href="style.css?v=20260610.3">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css">
     <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js"></script>
     <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/contrib/auto-render.min.js"></script>
@@ -26,10 +32,20 @@
         <div class="overlay-content">
             <h1 id="level-game-title">DerivaMatch</h1>
             <p>Select your level:</p>
-            <button class="level-btn easy-btn" onclick="selectLevel('easy')">Easy<br><small id="easy-desc">Basic Derivatives</small></button>
-            <button class="level-btn normal-btn" onclick="selectLevel('normal')">Normal<br><small id="normal-desc">Product &amp; Quotient Rules</small></button>
-            <button class="level-btn hard-btn" onclick="selectLevel('hard')">Hard<br><small id="hard-desc">Chain Rule</small></button>
+            <div id="level-buttons"></div>
             <button class="level-btn back-btn" onclick="backToGameSelect()">Back</button>
+        </div>
+    </div>
+
+    <!-- Mode Config Overlay (difficulty preset OR custom function types) -->
+    <div id="config-overlay" class="overlay hidden">
+        <div class="overlay-content">
+            <h1 id="config-title">Basic</h1>
+            <p>Pick a difficulty…</p>
+            <button class="level-btn easy-btn" onclick="startWithPreset('easy')">Easy<br><small id="preset-easy-desc">Integer coefficients, fewer fractions</small></button>
+            <button class="level-btn normal-btn" onclick="startWithPreset('normal')">Normal<br><small id="preset-normal-desc">Full range, including fractions</small></button>
+            <button id="preset-hard" class="level-btn hard-btn" onclick="startWithPreset('hard')">Hard<br><small id="preset-hard-desc">Adds tan, cot, sec, csc</small></button>
+            <button class="level-btn back-btn" onclick="showLevelSelect()">Back</button>
         </div>
     </div>
 
@@ -63,6 +79,6 @@
         </main>
     </div>
 
-    <script defer src="game.js"></script>
+    <script defer src="game.js?v=20260610.3"></script>
 </body>
 </html>

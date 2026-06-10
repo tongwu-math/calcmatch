@@ -1,24 +1,34 @@
 import random
 from collections import Counter, defaultdict
 
-def generate_level(mode):
+def generate_level(mode, difficulty=None, families=None):
 
+    # Basic antiderivatives. Each pair tagged with a `family` and a `level`:
+    #   level 'easy'   -> integer coefficients, no fractions on either side
+    #   level 'normal' -> fraction-bearing forms (x^n -> x^(n+1)/(n+1), 1/x, etc.)
     easy_pairs = [
-        {"pair_id": 1, "function": "x^2", "antiderivative": "\\frac{x^3}{3}"},
-        {"pair_id": 2, "function": "x^3", "antiderivative": "\\frac{x^4}{4}"},
-        {"pair_id": 3, "function": "x^4", "antiderivative": "\\frac{x^5}{5}"},
-        {"pair_id": 4, "function": "x", "antiderivative": "\\frac{x^2}{2}"},
-        {"pair_id": 5, "function": "\\sin(x)", "antiderivative": "-\\cos(x)"},
-        {"pair_id": 6, "function": "\\cos(x)", "antiderivative": "\\sin(x)"},
-        {"pair_id": 7, "function": "\\sec^2(x)", "antiderivative": "\\tan(x)"},
-        {"pair_id": 8, "function": "\\frac{1}{x}", "antiderivative": "\\ln|x|"},
-        {"pair_id": 9, "function": "e^x", "antiderivative": "e^x"},
-        {"pair_id": 10, "function": "e^{2x}", "antiderivative": "\\frac{e^{2x}}{2}"},
-        {"pair_id": 11, "function": "2x", "antiderivative": "x^2"},
-        {"pair_id": 12, "function": "3x^2", "antiderivative": "x^3"},
-        {"pair_id": 13, "function": "\\frac{1}{1 + x^2}", "antiderivative": "\\arctan(x)"},
-        {"pair_id": 14, "function": "\\csc^2(x)", "antiderivative": "-\\cot(x)"},
-        {"pair_id": 15, "function": "\\frac{1}{\\sqrt{1 - x^2}}", "antiderivative": "\\arcsin(x)"},
+        {"pair_id": 1, "function": "x^2", "antiderivative": "\\frac{x^3}{3}", "family": "poly", "level": "normal"},
+        {"pair_id": 2, "function": "x^3", "antiderivative": "\\frac{x^4}{4}", "family": "poly", "level": "normal"},
+        {"pair_id": 3, "function": "x^4", "antiderivative": "\\frac{x^5}{5}", "family": "poly", "level": "normal"},
+        {"pair_id": 4, "function": "x", "antiderivative": "\\frac{x^2}{2}", "family": "poly", "level": "normal"},
+        {"pair_id": 5, "function": "\\sin(x)", "antiderivative": "-\\cos(x)", "family": "trig", "level": "easy"},
+        {"pair_id": 6, "function": "\\cos(x)", "antiderivative": "\\sin(x)", "family": "trig", "level": "easy"},
+        {"pair_id": 7, "function": "\\sec^2(x)", "antiderivative": "\\tan(x)", "family": "trig", "level": "easy"},
+        {"pair_id": 8, "function": "\\frac{1}{x}", "antiderivative": "\\ln|x|", "family": "log", "level": "normal"},
+        {"pair_id": 9, "function": "e^x", "antiderivative": "e^x", "family": "exp", "level": "easy"},
+        {"pair_id": 10, "function": "e^{2x}", "antiderivative": "\\frac{e^{2x}}{2}", "family": "exp", "level": "normal"},
+        {"pair_id": 11, "function": "2x", "antiderivative": "x^2", "family": "poly", "level": "easy"},
+        {"pair_id": 12, "function": "3x^2", "antiderivative": "x^3", "family": "poly", "level": "easy"},
+        {"pair_id": 13, "function": "\\frac{1}{1 + x^2}", "antiderivative": "\\arctan(x)", "family": "inv_trig", "level": "normal"},
+        {"pair_id": 14, "function": "\\csc^2(x)", "antiderivative": "-\\cot(x)", "family": "trig", "level": "easy"},
+        {"pair_id": 15, "function": "\\frac{1}{\\sqrt{1 - x^2}}", "antiderivative": "\\arcsin(x)", "family": "inv_trig", "level": "normal"},
+        {"pair_id": 16, "function": "4x^3", "antiderivative": "x^4", "family": "poly", "level": "easy"},
+        {"pair_id": 17, "function": "5x^4", "antiderivative": "x^5", "family": "poly", "level": "easy"},
+        {"pair_id": 18, "function": "6x^5", "antiderivative": "x^6", "family": "poly", "level": "easy"},
+        # pool extension (2026-06)
+        {"pair_id": 19, "function": "\\sec(x)\\tan(x)", "antiderivative": "\\sec(x)", "family": "trig", "level": "easy"},
+        {"pair_id": 20, "function": "\\frac{1}{2\\sqrt{x}}", "antiderivative": "\\sqrt{x}", "family": "poly", "level": "normal"},
+        {"pair_id": 21, "function": "e^{3x}", "antiderivative": "\\frac{e^{3x}}{3}", "family": "exp", "level": "normal"},
     ]
 
     normal_pairs = [
@@ -58,7 +68,10 @@ def generate_level(mode):
         p["expected_parts"] = 3
 
     if mode == "easy":
-        selected_pairs = random.sample(easy_pairs, 10)
+        pool = _filter_pairs(easy_pairs, difficulty, families)
+        if not pool:
+            pool = easy_pairs
+        selected_pairs = random.sample(pool, min(10, len(pool)))
         return _build_easy_mode(selected_pairs)
 
     elif mode == "normal":
@@ -92,6 +105,21 @@ def generate_level(mode):
         return _build_hard_mode(selected)
 
     return {"blocks": [], "operators": []}
+
+
+_LEVEL_ORDER = {"easy": 1, "normal": 2, "hard": 3}
+
+
+def _filter_pairs(pairs, difficulty, families):
+    """Filter basic-antiderivative pairs by custom families (overrides
+    difficulty) or by a cumulative easy/normal/hard preset."""
+    if families:
+        fam = set(families)
+        return [p for p in pairs if p["family"] in fam]
+    if difficulty in _LEVEL_ORDER:
+        max_level = _LEVEL_ORDER[difficulty]
+        return [p for p in pairs if _LEVEL_ORDER[p["level"]] <= max_level]
+    return list(pairs)
 
 
 def _build_easy_mode(pairs):

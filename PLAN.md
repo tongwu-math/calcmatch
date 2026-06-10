@@ -1,117 +1,91 @@
-# DerivaMatch - Educational Math Game
+# CalcMatch — Educational Calculus Matching Game
 
-## Project Overview
-DerivaMatch is a web-based educational math game designed to help users learn and practice calculus derivatives through interactive gameplay. The game features three difficulty modes (Easy, Normal, Hard) with increasing complexity, challenging players to match functions with their derivatives using various gameplay mechanics.
+## Overview
+CalcMatch is a web-based calculus practice game. Players clear a board by matching
+expressions: functions with their derivatives (**DerivaMatch**) or integrands with their
+antiderivatives / solution steps (**IntegraMatch**). Each level is a 60-second timed board.
 
 ## Architecture
-- **Frontend**: HTML, CSS, Vanilla JavaScript
-- **Backend**: Python (Flask/FastAPI)
-- **Communication**: RESTful API endpoints
+- **Frontend**: HTML + CSS + vanilla JavaScript, math rendered with **KaTeX** (auto-render).
+- **Backend**: Python **Flask** (`flask_compress` for gzip/brotli), stateless level generation.
+- **Communication**: single REST endpoint, `GET /api/get_level_data`.
 
-## Project Structure
 ```
-DerivaMatch/
-├── venv/                      # Python virtual environment
-├── backend/                   # Backend logic and server
-│   ├── server.py              # Main server file
-│   ├── level_generator.py     # Level generation logic
-│   └── requirements.txt       # Python dependencies
-├── frontend/                  # Frontend WebUI
-│   ├── index.html             # Main HTML file
-│   ├── style.css              # Stylesheet
-│   └── game.js                # Game logic
-└── PLAN.md                    # Project plan and checklist
+calcmatch/
+├── backend/
+│   ├── server.py             # Flask app + /api/get_level_data + static file serving
+│   ├── level_generator.py    # dispatcher → deriva / integra generators
+│   ├── deriva_generator.py   # DerivaMatch boards (basic / product / quotient / chain)
+│   └── integra_generator.py  # IntegraMatch boards (basic / u-sub / by-parts)
+├── frontend/
+│   ├── index.html            # overlays (game → level → config) + game board
+│   ├── style.css             # dark theme, block grid, overlays
+│   └── game.js               # state machine, click handlers, KaTeX rendering
+├── requirements.txt
+├── PLAN.md / todo.md / fix_log.md
+└── venv/  backup/            # gitignored
 ```
 
-## Phase Checklist
+## Games & Modes
 
-### Phase 1: Project Initialization
-- [x] Create root directory named DerivaMatch
-- [x] Create Python virtual environment (venv)
-- [x] Create backend/ and frontend/ subfolders
-- [x] Create PLAN.md file
+### DerivaMatch (`game=deriva`)
+| Mode key | Display | Board | Config step |
+|----------|---------|-------|-------------|
+| `basic`    | Basic            | one-to-one: f ↔ f′ (2 blocks/match) | yes |
+| `product`  | Product Rule     | one-to-one: (f·g) ↔ (f·g)′           | yes |
+| `quotient` | Quotient Rule    | one-to-one: (f/g) ↔ (f/g)′           | yes |
+| `chain`    | Chain Rule       | multi-block: f(g(x)) + 2 factor blocks | no |
 
-### Phase 2: Backend Setup (Python)
-- [x] Activate venv and install dependencies
-- [x] Create requirements.txt
-- [x] Create server.py with Flask/FastAPI
-- [x] Create level_generator.py
-- [x] Implement /api/get_level_data endpoint
+### IntegraMatch (`game=integra`)
+| Mode key | Display | Board | Config step |
+|----------|---------|-------|-------------|
+| `easy`   | Basic              | one-to-one: ∫f ↔ F | yes |
+| `normal` | u-Substitution     | 3-block: ∫f dx + (u=g) + ∫…du | no |
+| `hard`   | Integration by Parts | 3-block: ∫uv′ dx + uv + ∫u′v dx | no |
 
-### Phase 3: Frontend Core (WebUI)
-- [x] Create index.html with basic layout
-- [x] Create style.css with block styling
-- [x] Implement block highlighting for selected items
+### Config step (difficulty preset)
+For config-enabled modes, after picking a level the player chooses a **difficulty preset** —
+`easy` / `normal` / `hard` (cumulative: easy ⊆ normal ⊆ hard); `easy` favors integer
+coefficients / fewer fractions, `hard` adds the harder families (e.g. `tan, cot, sec, csc`
+in DerivaMatch Basic).
 
-### Phase 4: Game Mechanics (JavaScript)
-- [x] Fetch board data from API and render blocks
-- [x] Implement click logic (left/right click)
-- [x] Implement Easy Mode validation
-- [x] Add success animations and scoring
+`difficulty` is passed to the API; if omitted the full pool is used. The API also accepts a
+`families` filter (`poly,trig,inv_trig,exp,log`), but the custom-type UI was removed
+2026-06-10 — presets only for now. DerivaMatch Basic uses **balanced sampling** across
+families so no single family (e.g. polynomials) dominates a board, and rarer families like
+`log` reliably appear.
 
-### Phase 5: Advanced Modes & Evaluation
-- [x] Implement Normal Mode chain rule logic
-- [x] Create /api/validate_hard_mode endpoint
-- [x] Implement numerical evaluation in Python
-- [x] Hook up Hard Mode submission in frontend
+## Matching model (`function_id` / `factor_id`)
+Every block carries id lists describing the pairs it belongs to and its role:
+- **One-to-one modes**: a function block has `function_id=[pair]`; its derivative block has
+  `factor_id=[pair]`. A match links a `function_id` to a `factor_id` sharing a pair.
+  Merge is **cross-role by text**: every block with text T carries all function_ids *and*
+  all factor_ids of T, so identical-looking blocks are fully interchangeable (e.g. either
+  `cos(x)` copy matches `sin(x)` *or* `-sin(x)`); two copies of the same text can never
+  match each other. The equation bar derives the displayed direction from the matched ids.
+- **Chain mode**: 1st click = a block with a `function_id` (the function, sets the pair id);
+  2nd/3rd clicks = blocks whose `factor_id` contains that pair id and are **not identical**
+  to a factor already chosen. Merge here is **role-separated** (a function block keeps only
+  `function_id`s, a factor block only `factor_id`s) so cross-referential texts like
+  `cos(ln x)` can't be exploited.
+- **Deselect**: re-click (or right-click) a selected block. Deselecting the 1st-clicked
+  block clears the whole selection (the later picks' roles depend on it).
+- IntegraMatch u-sub uses `preusub_id`/`usub_id`/`postusub_id`; by-parts uses
+  `uvp_id`/`uv_id`/`vup_id`.
 
-## Current Status
-**Phase 10: Level Restructure & Game Flow Overhaul Completed!**
+## API
+`GET /api/get_level_data`
+- `game` — `deriva` | `integra`
+- `mode` — deriva: `basic|product|quotient|chain`; integra: `easy|normal|hard`
+- `difficulty` *(optional)* — `easy|normal|hard`
+- `families` *(optional)* — comma list of `poly,trig,inv_trig,exp,log`
+- Returns `{ "blocks": [...], "operators": [] }`. Invalid params → `400`.
 
-## Phase 10: Level Restructure & Game Flow Overhaul
-- [x] Easy: Basic derivatives, one-to-one matching (unchanged)
-- [x] Normal: Product & Quotient rules, one-to-one matching
-- [x] Hard: Chain rule with complex inner functions (sin(cos(x)), ln(tan(x)), e^sec(x)...), multi-block factors
-- [x] Level selection overlay on game start
-- [x] No time bonus for correct matches
-- [x] -5 sec penalty for incorrect attempts (easy/normal)
-- [x] Pass/fail overlay with Replay and Change Level buttons
-- [x] 60 sec time limit for all modes
-- [x] Hard mode uses multi-block chain rule mechanics like old normal mode
-- [x] UI & Styling Overhaul (CSS) - Dark Mode, subtle shadows, smooth animations
-- [x] MathJax Integration (HTML/JS) - LaTeX rendering for math equations
-- [x] Selection Logic & Bug Fixes (JavaScript) - Prevent double clicks, side panel exception
-- [x] Auto-Resolution and Error Handling (JavaScript) - Remove submit button, auto-evaluate on selection complete
-- [x] Backend Board Generation (Python) - 5x6 grid for Easy Mode (15 unique pairs)
+## Scoring & flow
+- One-to-one match: +100 (Basic) / +200 (others). Multi-block match: +200.
+- Wrong 2-block match (one-to-one): −5 s + shake. Chain/multi: invalid clicks are ignored.
+- Clearing every block → "Level Complete"; timer to 0 → "Time Up". 60 s per board.
 
-## Phase 7: Easy Mode Selection Bug Fix
-- [x] Root cause: querySelectorAll by pair_id matched both blocks in a pair, causing instant highlight/disable
-- [x] Added unique per-element `data-uid` attribute (incrementing counter) separate from `data-pair-id`
-- [x] Easy Mode click handler now uses `event.currentTarget` to target exact clicked DOM element
-- [x] Selection stores `{ element, pairId, latex, blockType }` with direct DOM reference
-- [x] Match validation compares `pairId` values only — no DOM id lookup
-- [x] Success: green flash animation (`match-success` class) + 350ms delay then `element.remove()`
-- [x] Mismatch: shake animation (`error` class) + 450ms delay then restore `pointer-events: auto` and clear classes
-- [x] Mismatch penalty: -3 seconds deducted
-- [x] Guard: ignores clicks when `activeSelection.length >= 2` to prevent spam during animation
-- [x] Added `.block.match-success` CSS keyframe animation (scale pop + green glow)
-
-## Phase 8: Normal Mode Overhaul
-- [x] Backend: new `normal_pairs` list with 15 chain rule problems, each with `factors` list (multiplicative components of f')
-- [x] Backend: generates 25-30 blocks (1 function + N factor blocks per pair, shuffled)
-- [x] Frontend: dedicated `handleNormalBlockClick` — first click must be a function, subsequent must be derivatives with matching pairId
-- [x] Frontend: invalid clicks silently ignored (no error animation needed, just won't select)
-- [x] Frontend: auto-validates when `activeSelection.length === expected_parts`
-- [x] Frontend: right-click on last-selected block undoes it (`handleNormalRightClick`)
-- [x] Frontend: success → green flash → 350ms → remove all selected elements
-
-## Phase 9: Hard Mode Overhaul
-- [x] Backend: generates 5 function blocks from basic derivative pairs + 22 operator/constant blocks
-- [x] Backend: operator panel includes numbers, x, x^2, trig functions, ln, e^x, sqrt, operators
-- [x] Backend: rewritten `latex_to_python()` with proper \frac{}, \sqrt{}, func^n() handling
-- [x] Backend: rewritten `safe_eval()` using sandboxed eval with math function locals
-- [x] Backend: numerical evaluation at random x in [1.5, 4.5], tolerance 0.01
-- [x] Frontend: player selects function block first, then constructs derivative via operator panel
-- [x] Frontend: equation bar shows `(f)' = [constructed expression]` in LaTeX
-- [x] Frontend: operator blocks are reusable (no is-selected lock)
-- [x] Frontend: submit validates via `/api/validate_hard_mode` endpoint
-- [x] Frontend: matched functions hidden with `visibility: hidden` (grid position preserved)
-- [x] Operator panel styled with 4-column grid, smaller tiles
-
-**Game Features V2:**
-- Dark/sleek light theme with modern design
-- Professional LaTeX math rendering via MathJax
-- Auto-validation in Easy/Normal modes
-- Strict grid layout with 5x6 board for Easy Mode
-- No double-clicking, side panel operators reusable
-- Error handling with shake animations
+## Status
+All derivative/antiderivative content is numerically verified correct (see fix_log.md).
+Known remaining issues are tracked in todo.md.
