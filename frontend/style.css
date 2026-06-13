@@ -385,3 +385,79 @@ body.game-integra .hard-btn:hover {
     background: rgba(100, 100, 120, 0.7);
 }
 
+/* How-to-Play instructions (in-game help overlay) */
+.howto-row {
+    display: flex;
+    gap: 11px;
+    align-items: flex-start;
+    margin-top: 13px;
+}
+.howto-num {
+    flex-shrink: 0;
+    width: 22px;
+    height: 22px;
+    border-radius: 50%;
+    background: rgba(60, 140, 220, 0.3);
+    color: #cfe2ff;
+    font-size: 0.8rem;
+    font-weight: bold;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin-top: 1px;
+}
+.howto-row-title {
+    font-size: 0.9rem;
+    color: #e8eaed;
+    margin-bottom: 2px;
+}
+.howto-row-text {
+    font-size: 0.8rem;
+    color: #a0a8b4;
+    line-height: 1.5;
+}
+
+/* In-game help button (top bar) */
+.howto-help-btn {
+    width: 34px;
+    height: 34px;
+    padding: 0 !important;
+    border-radius: 50% !important;
+    font-weight: bold;
+}
+
+/* In-game help overlay: mode-specific block */
+.howto-body-game {
+    text-align: left;
+    margin-bottom: 20px;
+}
+.howto-mode {
+    background: rgba(45, 53, 72, 0.6);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 8px;
+    padding: 12px 14px;
+    margin-bottom: 16px;
+}
+.howto-mode-title {
+    font-size: 0.95rem;
+    color: #e8eaed;
+    font-weight: bold;
+    margin-bottom: 8px;
+}
+.howto-steps {
+    margin: 0;
+    padding-left: 20px;
+}
+.howto-steps li {
+    font-size: 0.85rem;
+    color: #c3cad6;
+    line-height: 1.6;
+}
+.howto-general-label {
+    font-size: 0.75rem;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: #8a93a6;
+    margin: 0 0 2px;
+}
+

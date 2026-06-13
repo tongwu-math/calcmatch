@@ -11,7 +11,7 @@
     <link rel="preload" as="font" type="font/woff2" crossorigin href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/fonts/KaTeX_Main-Regular.woff2">
     <link rel="preload" as="font" type="font/woff2" crossorigin href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/fonts/KaTeX_Math-Italic.woff2">
     <!-- Bump ?v= on every deploy: assets are cached for 24h, the version busts the cache. -->
-    <link rel="stylesheet" href="style.css?v=20260610.3">
+    <link rel="stylesheet" href="style.css?v=20260613.2">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css">
     <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js"></script>
     <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/contrib/auto-render.min.js"></script>
@@ -49,6 +49,15 @@
         </div>
     </div>
 
+    <!-- How-to-Play Overlay (in-game, mode-aware) -->
+    <div id="howto-overlay" class="overlay hidden">
+        <div class="overlay-content">
+            <h1>How to play</h1>
+            <div id="howto-body-game" class="howto-body howto-body-game"></div>
+            <button class="level-btn back-btn" onclick="closeHowToOverlay()">Got it</button>
+        </div>
+    </div>
+
     <!-- Pass/Fail Overlay -->
     <div id="result-overlay" class="overlay hidden">
         <div class="overlay-content">
@@ -65,6 +74,7 @@
             <div class="timer">Time: <span id="timer">60</span>s</div>
             <div class="score">Score: <span id="score">0</span></div>
             <span class="level-label" id="level-label"></span>
+            <button id="howto-help" class="howto-help-btn" onclick="openHowToOverlay()" aria-label="How to play" title="How to play">?</button>
             <button id="new-game" onclick="showLevelSelect()">New Game</button>
         </header>
 
@@ -79,6 +89,6 @@
         </main>
     </div>
 
-    <script defer src="game.js?v=20260610.3"></script>
+    <script defer src="game.js?v=20260613.2"></script>
 </body>
 </html>

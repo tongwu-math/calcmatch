@@ -819,6 +819,9 @@ function renderMathJax() {
 // ============================================================
 
 function startTimer() {
+    // Don't run the clock while the help overlay is up — it pauses the game.
+    // (Covers the race where a board finishes loading after the player opens help.)
+    if (howtoOverlay && !howtoOverlay.classList.contains('hidden')) return;
     if (gameState.timer) clearInterval(gameState.timer);
     gameState.timer = setInterval(function() {
         gameState.timeLeft = Math.max(0, gameState.timeLeft - 1);
@@ -833,4 +836,75 @@ function startTimer() {
 function updateUI() {
     timerElement.textContent = gameState.timeLeft;
     scoreElement.textContent = gameState.score;
+}
+
+
+// ============================================================
+// HOW-TO-PLAY (instructions)
+// ============================================================
+
+// The three universal rules, shown on the landing panel and inside the in-game help.
+var GENERAL_RULES = [
+    { title: 'Match each pair', text: 'A function with its derivative — or an integrand with its antiderivative.' },
+    { title: 'Tap to build', text: 'Click blocks and they combine in the bar up top. Re-click (or right-click) a block to deselect it.' },
+    { title: 'Beat the clock', text: 'Clear the whole board in 60 seconds. A wrong match costs you 5 seconds.' }
+];
+
+// Per-mode mechanics: how many blocks and the click order. Mirrors the click
+// handlers (handleDerivaHardClick / handleIntegraMultiClick) — keep in sync.
+var MODE_HELP = {
+    'deriva:basic':    { blocks: 2, steps: ['Tap a function and its derivative — either order works.'] },
+    'deriva:product':  { blocks: 2, steps: ['Tap a product and its derivative — either order works.'] },
+    'deriva:quotient': { blocks: 2, steps: ['Tap a quotient and its derivative — either order works.'] },
+    'deriva:chain':    { blocks: 3, steps: ['Tap the composite function f(g(x)) first.', 'Then tap its two derivative factors.'] },
+    'integra:easy':    { blocks: 2, steps: ['Tap an integral and its antiderivative — either order works.'] },
+    'integra:normal':  { blocks: 3, steps: ['Tap the integral ∫f dx first.', 'Then the substitution u = g.', 'Then the rewritten integral ∫…du.'] },
+    'integra:hard':    { blocks: 3, steps: ['Tap the integral ∫u·v′ dx first.', 'Then u·v and the integral ∫u′v dx.'] }
+};
+
+var howtoOverlay = document.getElementById('howto-overlay');
+
+function generalRulesHTML() {
+    return GENERAL_RULES.map(function(r, i) {
+        return '<div class="howto-row">' +
+            '<span class="howto-num">' + (i + 1) + '</span>' +
+            '<div><div class="howto-row-title">' + r.title + '</div>' +
+            '<div class="howto-row-text">' + r.text + '</div></div></div>';
+    }).join('');
+}
+
+// True only while a board is being played (no selection/result overlay covering it).
+function howtoInActiveGame() {
+    return gameState.timeLeft > 0 &&
+        resultOverlay.classList.contains('hidden') &&
+        gameOverlay.classList.contains('hidden') &&
+        levelOverlay.classList.contains('hidden') &&
+        configOverlay.classList.contains('hidden');
+}
+
+function openHowToOverlay() {
+    var body = document.getElementById('howto-body-game');
+    if (body) {
+        var html = '';
+        var mh = MODE_HELP[gameState.currentGame + ':' + gameState.currentMode];
+        if (mh) {
+            html += '<div class="howto-mode">' +
+                '<div class="howto-mode-title">' +
+                modeTitle(gameState.currentGame, gameState.currentMode) +
+                ' — match ' + mh.blocks + ' blocks</div>' +
+                '<ol class="howto-steps">' +
+                mh.steps.map(function(s) { return '<li>' + s + '</li>'; }).join('') +
+                '</ol></div>';
+        }
+        html += '<div class="howto-general-label">The basics</div>' + generalRulesHTML();
+        body.innerHTML = html;
+    }
+    // Pause the timer while the player reads the rules.
+    clearInterval(gameState.timer);
+    howtoOverlay.classList.remove('hidden');
+}
+
+function closeHowToOverlay() {
+    howtoOverlay.classList.add('hidden');
+    if (howtoInActiveGame()) startTimer();
 }
