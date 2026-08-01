@@ -10,7 +10,7 @@
     <!-- Preload the two KaTeX fonts every board uses, so math paints without a font stall. -->
     <link rel="preload" as="font" type="font/woff2" crossorigin href="vendor/katex/fonts/KaTeX_Main-Regular.woff2">
     <link rel="preload" as="font" type="font/woff2" crossorigin href="vendor/katex/fonts/KaTeX_Math-Italic.woff2">
-    <link rel="stylesheet" href="style.css?v=static2">
+    <link rel="stylesheet" href="style.css?v=static3">
     <link rel="stylesheet" href="vendor/katex/katex.min.css">
     <script defer src="vendor/katex/katex.min.js"></script>
     <script defer src="vendor/katex/contrib/auto-render.min.js"></script>
@@ -88,6 +88,10 @@
         <main class="game-board">
             <div id="block-container" class="block-container"></div>
         </main>
+
+        <footer class="site-footer">
+            <a href="https://tongwu-math.github.io/" target="_blank" rel="noopener noreferrer">Made by Tong Wu with Claude</a>
+        </footer>
     </div>
 
     <!-- generator.js must load before game.js (defer preserves this order). -->
