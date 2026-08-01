@@ -1,0 +1,18 @@
+# Netlify config for the CalcMatch static site.
+# The deployable site lives in static/. No build step — Netlify just publishes that folder.
+# Connect this repo in the Netlify dashboard ("Add new site → Import an existing project");
+# Netlify reads this file automatically, so no build settings need to be entered by hand.
+[build]
+  publish = "static"
+  command = ""
+
+# Long-cache the fingerprint-able assets; HTML stays fresh so ?v= bumps take effect on deploy.
+[[headers]]
+  for = "/vendor/*"
+  [headers.values]
+    Cache-Control = "public, max-age=31536000, immutable"
+
+[[headers]]
+  for = "/*.html"
+  [headers.values]
+    Cache-Control = "no-cache"

@@ -1,0 +1,976 @@
+// Game State
+let gameState = {
+    currentGame: null,
+    currentMode: null,
+    difficulty: null,
+    levelData: null,
+    activeSelection: [],
+    score: 0,
+    timeLeft: 60,
+    timer: null,
+    isProcessing: false,
+    blockUid: 0
+};
+
+// DOM Elements
+const blockContainer = document.getElementById('block-container');
+const activeEquation = document.getElementById('active-equation');
+const timerElement = document.getElementById('timer');
+const scoreElement = document.getElementById('score');
+const levelLabel = document.getElementById('level-label');
+const gameOverlay = document.getElementById('game-overlay');
+const levelOverlay = document.getElementById('level-overlay');
+const resultOverlay = document.getElementById('result-overlay');
+const resultTitle = document.getElementById('result-title');
+const resultScore = document.getElementById('result-score');
+const levelGameTitle = document.getElementById('level-game-title');
+const levelButtons = document.getElementById('level-buttons');
+const equationTitle = document.getElementById('equation-title');
+const configOverlay = document.getElementById('config-overlay');
+const configTitle = document.getElementById('config-title');
+const presetHardBtn = document.getElementById('preset-hard');
+
+// Mode list per game. `config: true` opens the difficulty/function-type step.
+const MODES = {
+    deriva: [
+        { key: 'basic', title: 'Basic', desc: 'Single-function derivatives', btnClass: 'easy-btn', config: true },
+        { key: 'product', title: 'Product Rule', desc: '(f · g)′', btnClass: 'normal-btn', config: true },
+        { key: 'quotient', title: 'Quotient Rule', desc: '(f / g)′', btnClass: 'quotient-btn', config: true },
+        { key: 'chain', title: 'Chain Rule', desc: 'f(g(x))′', btnClass: 'hard-btn', config: false }
+    ],
+    integra: [
+        { key: 'easy', title: 'Basic', desc: 'Basic Antiderivatives', btnClass: 'easy-btn', config: true },
+        { key: 'normal', title: 'u-Substitution', desc: 'u-Substitution', btnClass: 'normal-btn', config: false },
+        { key: 'hard', title: 'Integration by Parts', desc: 'Integration by Parts', btnClass: 'hard-btn', config: false }
+    ]
+};
+
+function modeDef(game, mode) {
+    return MODES[game].find(function(m) { return m.key === mode; });
+}
+
+function modeTitle(game, mode) {
+    var m = modeDef(game, mode);
+    return m ? m.title : mode;
+}
+
+function modeSupportsConfig(game, mode) {
+    var m = modeDef(game, mode);
+    return !!(m && m.config);
+}
+
+function renderLevelButtons(game) {
+    levelButtons.innerHTML = '';
+    MODES[game].forEach(function(m) {
+        var b = document.createElement('button');
+        b.className = 'level-btn ' + m.btnClass;
+        b.onclick = function() { selectLevel(m.key); };
+        b.innerHTML = m.title + '<br><small>' + m.desc + '</small>';
+        levelButtons.appendChild(b);
+    });
+}
+
+
+// ============================================================
+// GAME & LEVEL SELECTION
+// ============================================================
+
+function selectGame(game) {
+    gameState.currentGame = game;
+    document.body.className = 'game-' + game;
+    levelGameTitle.textContent = game === 'deriva' ? 'DerivaMatch' : 'IntegraMatch';
+    renderLevelButtons(game);
+    gameOverlay.classList.add('hidden');
+    levelOverlay.classList.remove('hidden');
+}
+
+function backToGameSelect() {
+    levelOverlay.classList.add('hidden');
+    gameOverlay.classList.remove('hidden');
+}
+
+function selectLevel(mode) {
+    gameState.currentMode = mode;
+    gameState.difficulty = null;
+
+    if (modeSupportsConfig(gameState.currentGame, mode)) {
+        levelOverlay.classList.add('hidden');
+        configTitle.textContent = modeTitle(gameState.currentGame, mode);
+        // IntegraMatch Basic has no 'hard' tier — hide that preset.
+        presetHardBtn.style.display = gameState.currentGame === 'integra' ? 'none' : 'block';
+        configOverlay.classList.remove('hidden');
+        return;
+    }
+    beginGame();
+}
+
+function startWithPreset(diff) {
+    gameState.difficulty = diff;
+    beginGame();
+}
+
+function beginGame() {
+    levelOverlay.classList.add('hidden');
+    configOverlay.classList.add('hidden');
+    const g = gameState.currentGame === 'deriva' ? 'Deriva' : 'Integra';
+    var diffLabel = { easy: 'Easy', normal: 'Normal', hard: 'Hard' };
+    var suffix = gameState.difficulty ? ' · ' + diffLabel[gameState.difficulty] : '';
+    levelLabel.textContent = g + ' - ' + modeTitle(gameState.currentGame, gameState.currentMode) + suffix;
+    equationTitle.textContent = gameState.currentGame === 'deriva' ? 'Active Equation:' : 'Active Integration:';
+    startNewGame();
+}
+
+function showGameSelect() {
+    clearInterval(gameState.timer);
+    gameState.isProcessing = false;
+    resultOverlay.classList.add('hidden');
+    levelOverlay.classList.add('hidden');
+    configOverlay.classList.add('hidden');
+    gameOverlay.classList.remove('hidden');
+}
+
+function showLevelSelect() {
+    clearInterval(gameState.timer);
+    gameState.isProcessing = false;
+    resultOverlay.classList.add('hidden');
+    configOverlay.classList.add('hidden');
+    levelOverlay.classList.remove('hidden');
+}
+
+function replayLevel() {
+    resultOverlay.classList.add('hidden');
+    startNewGame();
+}
+
+function showResult(passed) {
+    clearInterval(gameState.timer);
+    gameState.isProcessing = true;
+    resultTitle.textContent = passed ? 'Level Complete!' : 'Time Up!';
+    resultTitle.className = passed ? 'pass' : 'fail';
+    resultScore.textContent = 'Score: ' + gameState.score;
+    resultOverlay.classList.remove('hidden');
+}
+
+
+// ============================================================
+// GAME INIT & RENDER
+// ============================================================
+
+function startNewGame() {
+    clearEquationForce();
+    blockContainer.innerHTML = '<div class="loading-msg">Loading…</div>';
+    gameState.activeSelection = [];
+    gameState.score = 0;
+    gameState.timeLeft = 60;
+    gameState.isProcessing = true;
+    gameState.blockUid = 0;
+    updateUI();
+
+    // Static build: boards are generated client-side (generator.js) instead of
+    // fetched from a backend, so this is instant with no server / cold-start wait.
+    try {
+        var data = generateLevel(gameState.currentGame, gameState.currentMode, gameState.difficulty);
+        gameState.levelData = data;
+        gameState.isProcessing = false;
+        renderBlocks();
+        updateUI();
+        startTimer();
+    } catch (error) {
+        console.error('Error generating level data:', error);
+        gameState.isProcessing = false;
+        blockContainer.innerHTML = '<div class="loading-msg">Failed to load level — please try again.</div>';
+    }
+}
+
+function renderBlocks() {
+    blockContainer.innerHTML = '';
+    gameState.levelData.blocks.forEach(function(block) {
+        var uid = gameState.blockUid++;
+        var blockDiv = document.createElement('div');
+        blockDiv.className = 'block';
+        blockDiv.innerHTML = '\\( ' + block.text + ' \\)';
+        blockDiv.dataset.uid = uid;
+        blockDiv.dataset.blockType = block.type;
+        blockDiv.dataset.latex = block.text;
+        blockDiv.dataset.expectedParts = block.expected_parts;
+
+        if (block.function_id && block.function_id.length > 0) blockDiv.dataset.functionId = block.function_id.join(',');
+        if (block.factor_id && block.factor_id.length > 0) blockDiv.dataset.factorId = block.factor_id.join(',');
+        if (block.func_id && block.func_id.length > 0) blockDiv.dataset.funcId = block.func_id.join(',');
+        if (block.int_id && block.int_id.length > 0) blockDiv.dataset.intId = block.int_id.join(',');
+        if (block.preusub_id && block.preusub_id.length > 0) blockDiv.dataset.preusubId = block.preusub_id.join(',');
+        if (block.usub_id && block.usub_id.length > 0) blockDiv.dataset.usubId = block.usub_id.join(',');
+        if (block.postusub_id && block.postusub_id.length > 0) blockDiv.dataset.postusubId = block.postusub_id.join(',');
+        if (block.uvp_id && block.uvp_id.length > 0) blockDiv.dataset.uvpId = block.uvp_id.join(',');
+        if (block.uv_id && block.uv_id.length > 0) blockDiv.dataset.uvId = block.uv_id.join(',');
+        if (block.vup_id && block.vup_id.length > 0) blockDiv.dataset.vupId = block.vup_id.join(',');
+
+        applyBlockRole(blockDiv);
+
+        var clickHandler;
+        if (gameState.currentGame === 'deriva') {
+            clickHandler = gameState.currentMode === 'chain' ? handleDerivaHardClick : handleDerivaEasyClick;
+        } else {
+            clickHandler = gameState.currentMode === 'easy' ? handleIntegraEasyClick : handleIntegraMultiClick;
+        }
+
+        blockDiv.addEventListener('click', clickHandler);
+        blockDiv.addEventListener('contextmenu', function(e) {
+            e.preventDefault();
+            handleRightClick(blockDiv);
+        });
+
+        blockContainer.appendChild(blockDiv);
+    });
+
+    renderLegend();
+    renderMathJax();
+}
+
+
+// ============================================================
+// ROLE COLORS (difficulty aid) + LEGEND
+// ============================================================
+
+// Tag a block with exactly one role class so its color shows what it is. Reads the block's
+// CURRENT id datasets, so calling it again after a match (when ids get stripped) recolors a
+// former "mix" block down to a single role.
+function applyBlockRole(el) {
+    el.classList.remove('role-f', 'role-fp', 'role-mid', 'role-mix');
+    function has(name) { return !!(el.dataset[name] && el.dataset[name].length > 0); }
+    var role;
+    if (gameState.currentGame === 'deriva') {
+        if (gameState.currentMode === 'chain') {
+            role = has('functionId') ? 'role-f' : 'role-fp';
+        } else {
+            var f = has('functionId'), fr = has('factorId');
+            role = (f && fr) ? 'role-mix' : (f ? 'role-f' : 'role-fp');
+        }
+    } else {
+        if (gameState.currentMode === 'easy') {
+            var fu = has('funcId'), it = has('intId');
+            role = (fu && it) ? 'role-mix' : (fu ? 'role-f' : 'role-fp');
+        } else if (gameState.currentMode === 'normal') {
+            role = has('preusubId') ? 'role-f' : (has('usubId') ? 'role-mid' : 'role-fp');
+        } else {
+            role = has('uvpId') ? 'role-f' : (has('uvId') ? 'role-mid' : 'role-fp');
+        }
+    }
+    if (role) el.classList.add(role);
+}
+
+// Per-mode color key: [swatch class, label]. Plain-text labels (unicode ∫, ′) — no KaTeX.
+var ROLE_LEGEND = {
+    'deriva:basic':    [['role-f', 'function'], ['role-fp', 'derivative'], ['role-mix', 'either']],
+    'deriva:product':  [['role-f', 'function'], ['role-fp', 'derivative'], ['role-mix', 'either']],
+    'deriva:quotient': [['role-f', 'function'], ['role-fp', 'derivative'], ['role-mix', 'either']],
+    'deriva:chain':    [['role-f', 'function f(g(x))'], ['role-fp', 'derivative factor']],
+    'integra:easy':    [['role-f', 'integrand'], ['role-fp', 'antiderivative'], ['role-mix', 'either']],
+    'integra:normal':  [['role-f', '∫ f dx'], ['role-mid', 'u = g'], ['role-fp', '∫ … du']],
+    'integra:hard':    [['role-f', '∫ uv′ dx'], ['role-mid', 'uv'], ['role-fp', '∫ u′v dx']]
+};
+
+function renderLegend() {
+    var el = document.getElementById('color-legend');
+    if (!el) return;
+    el.innerHTML = '';
+    var items = ROLE_LEGEND[gameState.currentGame + ':' + gameState.currentMode] || [];
+    items.forEach(function(it) {
+        var item = document.createElement('span');
+        item.className = 'legend-item';
+        var sw = document.createElement('span');
+        sw.className = 'legend-swatch ' + it[0];
+        var label = document.createElement('span');
+        label.textContent = it[1];
+        item.appendChild(sw);
+        item.appendChild(label);
+        el.appendChild(item);
+    });
+}
+
+
+// ============================================================
+// SHARED HELPERS
+// ============================================================
+
+function handleRightClick(el) {
+    if (gameState.isProcessing) return;
+    if (gameState.activeSelection.length === 0) return;
+    var idx = gameState.activeSelection.findIndex(function(sel) { return sel.element === el; });
+    if (idx === -1) return;
+    // Deselecting the anchor (1st click) invalidates the roles of every later pick —
+    // in u-sub the role checks are positional, so keeping the tail would allow a
+    // two-u-block "match" that consumes shared blocks and can soft-lock the board.
+    if (idx === 0 && gameState.activeSelection.length > 1) {
+        clearEquationForce();
+        return;
+    }
+    gameState.activeSelection.splice(idx, 1);
+    el.classList.remove('is-selected', 'selected-function', 'selected-derivative', 'selected-antiderivative');
+    updateEquationBar();
+}
+
+function handleMismatch(sels, clearClasses) {
+    sels.forEach(function(sel) { if (sel.element) sel.element.classList.add('error'); });
+    gameState.timeLeft = Math.max(0, gameState.timeLeft - 5);
+    updateUI();
+    setTimeout(function() {
+        sels.forEach(function(sel) {
+            if (sel.element) {
+                sel.element.classList.remove.apply(sel.element.classList, ['is-selected'].concat(clearClasses).concat(['error']));
+            }
+        });
+        gameState.activeSelection = [];
+        gameState.isProcessing = false;
+        updateEquationBar();
+    }, 450);
+}
+
+function checkWin() {
+    if (blockContainer.querySelectorAll('.block:not(.matched)').length === 0) {
+        clearInterval(gameState.timer); // stop now so the timer can't hit 0 during the delay
+        setTimeout(function() { showResult(true); }, 300);
+    }
+}
+
+function parseIds(el, field) {
+    return (el.dataset[field] || '').split(',').map(function(s) { return parseInt(s); }).filter(function(n) { return !isNaN(n); });
+}
+
+
+// ============================================================
+// DERIVAMATCH - EASY/NORMAL (function_id <-> factor_id)
+// ============================================================
+
+function handleDerivaEasyClick(event) {
+    if (gameState.isProcessing) return;
+    if (gameState.activeSelection.length >= 2) return;
+    var el = event.currentTarget;
+    if (el.classList.contains('is-selected')) { handleRightClick(el); return; }
+
+    el.classList.add('is-selected');
+
+    var bt = el.dataset.blockType;
+    if (bt === 'function') el.classList.add('selected-function');
+    else if (bt === 'derivative') el.classList.add('selected-derivative');
+
+    gameState.activeSelection.push({
+        element: el,
+        functionId: parseIds(el, 'functionId'),
+        factorId: parseIds(el, 'factorId'),
+        latex: el.dataset.latex,
+        blockType: bt
+    });
+
+    updateEquationBar();
+    if (gameState.activeSelection.length === 2) { gameState.isProcessing = true; validateDerivaEasy(); }
+}
+
+function validateDerivaEasy() {
+    var a = gameState.activeSelection[0], b = gameState.activeSelection[1];
+    var cid = a.functionId.find(function(id) { return b.factorId.includes(id); });
+    if (cid === undefined) cid = b.functionId.find(function(id) { return a.factorId.includes(id); });
+
+    if (cid !== undefined) {
+        a.element.classList.add('match-success'); b.element.classList.add('match-success');
+        gameState.score += gameState.currentMode === 'basic' ? 100 : 200;
+        updateUI();
+        setTimeout(function() {
+            a.element.classList.add('matched'); b.element.classList.add('matched');
+            document.querySelectorAll('.block:not(.matched)').forEach(function(bl) {
+                var fid = parseIds(bl, 'functionId');
+                var frid = parseIds(bl, 'factorId');
+                fid = fid.filter(function(id) { return id !== cid; });
+                frid = frid.filter(function(id) { return id !== cid; });
+                bl.dataset.functionId = fid.join(',');
+                bl.dataset.factorId = frid.join(',');
+                if (fid.length === 0 && frid.length === 0) bl.classList.add('matched');
+                else applyBlockRole(bl);
+            });
+            // Keep the completed equation on the bar until the next click re-renders it.
+            gameState.activeSelection = []; gameState.isProcessing = false; checkWin();
+        }, 350);
+    } else {
+        handleMismatch([a, b], ['selected-function', 'selected-derivative']);
+    }
+}
+
+
+// ============================================================
+// DERIVAMATCH - HARD (chain rule multi-block)
+// ============================================================
+
+function handleDerivaHardClick(event) {
+    if (gameState.isProcessing) return;
+    var el = event.currentTarget;
+    if (el.classList.contains('is-selected')) { handleRightClick(el); return; }
+
+    var eFid = parseIds(el, 'functionId');
+    var eFrid = parseIds(el, 'factorId');
+    var bt = el.dataset.blockType;
+
+    if (gameState.activeSelection.length === 0) {
+        // 1st click = the function: any block carrying a function_id. The role is decided by
+        // click order, not by a fixed type tag, so a block that is a function here and a
+        // factor elsewhere (e.g. cos(ln x)) stays fully interchangeable.
+        if (eFid.length === 0) return;
+    } else {
+        // 2nd & 3rd clicks = factors: must carry the function's id, and must not be identical
+        // to a factor already chosen. The function (index 0) is exempt, so a factor may equal
+        // the function's text — e.g. (e^{sec x})' = e^{sec x}·sec(x)tan(x) — while a shared
+        // factor such as 1/(2√x) or cos(ln x) can never be picked twice.
+        if (!eFrid.includes(gameState.activeSelection[0].functionId)) return;
+        var newLatex = el.dataset.latex;
+        if (gameState.activeSelection.slice(1).some(function(sel) { return sel.latex === newLatex; })) return;
+    }
+
+    el.classList.add('is-selected');
+    if (bt === 'function') el.classList.add('selected-function');
+    else if (bt === 'derivative') el.classList.add('selected-derivative');
+
+    gameState.activeSelection.push({
+        element: el,
+        functionId: gameState.activeSelection.length === 0 ? eFid[0] : gameState.activeSelection[0].functionId,
+        latex: el.dataset.latex, blockType: bt, expected_parts: el.dataset.expectedParts
+    });
+    updateEquationBar();
+
+    if (gameState.activeSelection.length === parseInt(gameState.activeSelection[0].expected_parts)) {
+        gameState.isProcessing = true; validateDerivaHard();
+    }
+}
+
+function validateDerivaHard() {
+    var fid = gameState.activeSelection[0].functionId;
+    if (!gameState.activeSelection.every(function(sel) { return sel.functionId === fid; })) {
+        handleMismatch(gameState.activeSelection, ['selected-function', 'selected-derivative']); return;
+    }
+    gameState.activeSelection.forEach(function(sel) { if (sel.element) sel.element.classList.add('match-success'); });
+    gameState.score += 200; updateUI();
+    setTimeout(function() {
+        var mp = gameState.activeSelection[0].functionId;
+        gameState.activeSelection.forEach(function(sel) { if (sel.element) sel.element.classList.add('matched'); });
+        document.querySelectorAll('.block:not(.matched)').forEach(function(bl) {
+            var fi = parseIds(bl, 'functionId');
+            var fr = parseIds(bl, 'factorId');
+            fi = fi.filter(function(id) { return id !== mp; });
+            fr = fr.filter(function(id) { return id !== mp; });
+            bl.dataset.functionId = fi.join(',');
+            bl.dataset.factorId = fr.join(',');
+            if (fi.length === 0 && fr.length === 0) bl.classList.add('matched');
+            else applyBlockRole(bl);
+        });
+        // Keep the completed equation on the bar until the next click re-renders it.
+        gameState.activeSelection = []; gameState.isProcessing = false; checkWin();
+    }, 350);
+}
+
+
+// ============================================================
+// INTEGRAMATCH - EASY (func_id <-> int_id)
+// ============================================================
+
+function handleIntegraEasyClick(event) {
+    if (gameState.isProcessing) return;
+    if (gameState.activeSelection.length >= 2) return;
+    var el = event.currentTarget;
+    if (el.classList.contains('is-selected')) { handleRightClick(el); return; }
+
+    el.classList.add('is-selected');
+    var bt = el.dataset.blockType;
+    if (bt === 'function') el.classList.add('selected-function');
+    else if (bt === 'antiderivative') el.classList.add('selected-antiderivative');
+
+    gameState.activeSelection.push({
+        element: el,
+        funcId: parseIds(el, 'funcId'),
+        intId: parseIds(el, 'intId'),
+        latex: el.dataset.latex, blockType: bt
+    });
+    updateEquationBar();
+    if (gameState.activeSelection.length === 2) { gameState.isProcessing = true; validateIntegraEasy(); }
+}
+
+function validateIntegraEasy() {
+    var a = gameState.activeSelection[0], b = gameState.activeSelection[1];
+    var cid = a.funcId.find(function(id) { return b.intId.includes(id); });
+    if (cid === undefined) cid = b.funcId.find(function(id) { return a.intId.includes(id); });
+
+    if (cid !== undefined) {
+        a.element.classList.add('match-success'); b.element.classList.add('match-success');
+        gameState.score += 100; updateUI();
+        setTimeout(function() {
+            a.element.classList.add('matched'); b.element.classList.add('matched');
+            document.querySelectorAll('.block:not(.matched)').forEach(function(bl) {
+                var fi = parseIds(bl, 'funcId');
+                var ii = parseIds(bl, 'intId');
+                fi = fi.filter(function(id) { return id !== cid; });
+                ii = ii.filter(function(id) { return id !== cid; });
+                bl.dataset.funcId = fi.join(',');
+                bl.dataset.intId = ii.join(',');
+                if (fi.length === 0 && ii.length === 0) bl.classList.add('matched');
+                else applyBlockRole(bl);
+            });
+            // Keep the completed equation on the bar until the next click re-renders it.
+            gameState.activeSelection = []; gameState.isProcessing = false; checkWin();
+        }, 350);
+    } else {
+        handleMismatch([a, b], ['selected-function', 'selected-antiderivative']);
+    }
+}
+
+
+// ============================================================
+// INTEGRAMATCH - NORMAL/HARD (multi-block matching)
+// ============================================================
+
+function handleIntegraMultiClick(event) {
+    if (gameState.isProcessing) return;
+    var el = event.currentTarget;
+    if (el.classList.contains('is-selected')) { handleRightClick(el); return; }
+
+    var ids = {
+        preusubId: parseIds(el, 'preusubId'),
+        usubId: parseIds(el, 'usubId'),
+        postusubId: parseIds(el, 'postusubId'),
+        uvpId: parseIds(el, 'uvpId'),
+        uvId: parseIds(el, 'uvId'),
+        vupId: parseIds(el, 'vupId')
+    };
+
+    if (gameState.activeSelection.length === 0) {
+        if (gameState.currentMode === 'normal' && ids.preusubId.length === 0) return;
+        if (gameState.currentMode === 'hard' && ids.uvpId.length === 0) return;
+    } else if (gameState.currentMode === 'normal') {
+        var fids = gameState.activeSelection[0].ids;
+        var hasCommon = ids.preusubId.concat(ids.usubId).concat(ids.postusubId).some(function(id) {
+            return fids.preusubId.concat(fids.usubId).concat(fids.postusubId).includes(id);
+        });
+        if (!hasCommon) return;
+        var pid = gameState.activeSelection[0].pairId;
+        if (gameState.activeSelection.length === 1) {
+            if (ids.usubId.length === 0) return;
+            if (!ids.usubId.includes(pid)) return;
+        } else if (gameState.activeSelection.length === 2) {
+            if (ids.postusubId.length === 0) return;
+            if (!ids.postusubId.includes(pid)) return;
+        }
+    } else {
+        fids = gameState.activeSelection[0].ids;
+        hasCommon = ids.uvpId.concat(ids.uvId).concat(ids.vupId).some(function(id) {
+            return fids.uvpId.concat(fids.uvId).concat(fids.vupId).includes(id);
+        });
+        if (!hasCommon) return;
+        pid = gameState.activeSelection[0].pairId;
+        if (ids.uvpId.includes(pid) && gameState.activeSelection.some(function(s) { return s.ids.uvpId.includes(pid); })) return;
+        if (ids.uvId.includes(pid) && gameState.activeSelection.some(function(s) { return s.ids.uvId.includes(pid); })) return;
+        if (ids.vupId.includes(pid) && gameState.activeSelection.some(function(s) { return s.ids.vupId.includes(pid); })) return;
+    }
+
+    el.classList.add('is-selected');
+    var bt = el.dataset.blockType;
+    if (bt === 'function') el.classList.add('selected-function');
+    else if (bt === 'antiderivative') el.classList.add('selected-antiderivative');
+
+    var pairId;
+    if (gameState.activeSelection.length === 0) {
+        pairId = gameState.currentMode === 'normal' ? ids.preusubId[0] : ids.uvpId[0];
+    } else {
+        pairId = gameState.activeSelection[0].pairId;
+    }
+
+    gameState.activeSelection.push({
+        element: el,
+        pairId: pairId,
+        ids: ids,
+        latex: el.dataset.latex,
+        blockType: bt,
+        expected_parts: el.dataset.expectedParts
+    });
+
+    updateEquationBar();
+
+    var expectedParts = parseInt(gameState.activeSelection[0].expected_parts);
+    if (gameState.activeSelection.length === expectedParts) {
+        gameState.isProcessing = true;
+        validateIntegraMulti();
+    }
+}
+
+function validateIntegraMulti() {
+    var pairId = gameState.activeSelection[0].pairId;
+    var allMatch = gameState.activeSelection.every(function(sel) {
+        return sel.ids.preusubId.concat(sel.ids.usubId).concat(sel.ids.postusubId)
+            .concat(sel.ids.uvpId).concat(sel.ids.uvId).concat(sel.ids.vupId)
+            .includes(pairId);
+    });
+
+    if (!allMatch) {
+        gameState.activeSelection.forEach(function(sel) { if (sel.element) sel.element.classList.add('error'); });
+        gameState.timeLeft = Math.max(0, gameState.timeLeft - 5);
+        updateUI();
+        setTimeout(function() {
+            gameState.activeSelection.forEach(function(sel) {
+                if (sel.element) {
+                    sel.element.classList.remove('is-selected', 'selected-function', 'selected-antiderivative', 'error');
+                }
+            });
+            gameState.activeSelection = [];
+            gameState.isProcessing = false;
+            updateEquationBar();
+        }, 450);
+        return;
+    }
+
+    gameState.activeSelection.forEach(function(sel) { if (sel.element) sel.element.classList.add('match-success'); });
+    gameState.score += 200;
+    updateUI();
+
+    setTimeout(function() {
+        var matchedPairId = gameState.activeSelection[0].pairId;
+        gameState.activeSelection.forEach(function(sel) { if (sel.element) sel.element.classList.add('matched'); });
+
+        document.querySelectorAll('.block:not(.matched)').forEach(function(bl) {
+            var preusubId = parseIds(bl, 'preusubId');
+            var usubId = parseIds(bl, 'usubId');
+            var postusubId = parseIds(bl, 'postusubId');
+            var uvpId = parseIds(bl, 'uvpId');
+            var uvId = parseIds(bl, 'uvId');
+            var vupId = parseIds(bl, 'vupId');
+
+            preusubId = preusubId.filter(function(id) { return id !== matchedPairId; });
+            usubId = usubId.filter(function(id) { return id !== matchedPairId; });
+            postusubId = postusubId.filter(function(id) { return id !== matchedPairId; });
+            uvpId = uvpId.filter(function(id) { return id !== matchedPairId; });
+            uvId = uvId.filter(function(id) { return id !== matchedPairId; });
+            vupId = vupId.filter(function(id) { return id !== matchedPairId; });
+
+            bl.dataset.preusubId = preusubId.join(',');
+            bl.dataset.usubId = usubId.join(',');
+            bl.dataset.postusubId = postusubId.join(',');
+            bl.dataset.uvpId = uvpId.join(',');
+            bl.dataset.uvId = uvId.join(',');
+            bl.dataset.vupId = vupId.join(',');
+
+            if (preusubId.length === 0 && usubId.length === 0 && postusubId.length === 0 &&
+                uvpId.length === 0 && uvId.length === 0 && vupId.length === 0) {
+                bl.classList.add('matched');
+            } else {
+                applyBlockRole(bl);
+            }
+        });
+
+        gameState.activeSelection = [];
+        gameState.isProcessing = false;
+        // Keep the completed equation on the bar until the next click re-renders it.
+        checkWin();
+    }, 350);
+}
+
+
+// ============================================================
+// EQUATION BAR
+// ============================================================
+
+function updateEquationBar() {
+    activeEquation.innerHTML = '';
+
+    if (gameState.activeSelection.length === 0) {
+        renderMathJax();
+        return;
+    }
+
+    if (gameState.currentGame === 'deriva') {
+        var funcSel = null;
+        var derivSels = null;
+        if (gameState.currentMode === 'chain') {
+            // Chain: the anchor (1st click) is always the function.
+            funcSel = gameState.activeSelection[0];
+            derivSels = gameState.activeSelection.slice(1);
+        } else {
+            // One-to-one: a block can be a function in one pair and a derivative in
+            // another (e.g. cos(x)), so decide the direction by the actual id match,
+            // not by which block was clicked first.
+            var a = gameState.activeSelection[0];
+            var b = gameState.activeSelection.length > 1 ? gameState.activeSelection[1] : null;
+            if (b) {
+                if (a.functionId.some(function(id) { return b.factorId.includes(id); })) {
+                    funcSel = a; derivSels = [b];
+                } else if (b.functionId.some(function(id) { return a.factorId.includes(id); })) {
+                    funcSel = b; derivSels = [a];
+                }
+            } else if (a.functionId.length > 0 && a.factorId.length === 0) {
+                // Unambiguous function — safe to show "(f)' =" right away.
+                funcSel = a; derivSels = [];
+            }
+        }
+        if (funcSel) {
+            var funcSpan = document.createElement('span');
+            funcSpan.innerHTML = '\\( \\left( ' + funcSel.latex + " \\right)' = \\)";
+            funcSpan.className = 'equation-item function';
+            activeEquation.appendChild(funcSpan);
+
+            derivSels.forEach(function(sel, idx) {
+                if (idx > 0) {
+                    var dot = document.createElement('span');
+                    dot.innerHTML = '\\( \\cdot \\)';
+                    dot.className = 'equation-item operator';
+                    activeEquation.appendChild(dot);
+                }
+                var span = document.createElement('span');
+                span.innerHTML = '\\( ' + sel.latex + ' \\)';
+                span.className = 'equation-item derivative';
+                activeEquation.appendChild(span);
+            });
+        } else {
+            gameState.activeSelection.forEach(function(sel) {
+                var span = document.createElement('span');
+                span.innerHTML = '\\( ' + sel.latex + ' \\)';
+                span.className = 'equation-item ' + sel.blockType;
+                activeEquation.appendChild(span);
+            });
+        }
+    } else if (gameState.currentGame === 'integra') {
+        if (gameState.currentMode === 'easy') {
+            // Show the pair as "∫ f dx = F". A block can be an integrand in one pair and
+            // an antiderivative in another (e.g. x^2), so decide the direction by the
+            // actual id match, like DerivaMatch one-to-one.
+            var ia = gameState.activeSelection[0];
+            var ib = gameState.activeSelection.length > 1 ? gameState.activeSelection[1] : null;
+            var integrandSel = null, antiSel = null;
+            if (ib) {
+                if (ia.funcId.some(function(id) { return ib.intId.includes(id); })) {
+                    integrandSel = ia; antiSel = ib;
+                } else if (ib.funcId.some(function(id) { return ia.intId.includes(id); })) {
+                    integrandSel = ib; antiSel = ia;
+                }
+            } else if (ia.funcId.length > 0 && ia.intId.length === 0) {
+                // Unambiguous integrand — safe to show "∫ f dx =" right away.
+                integrandSel = ia;
+            }
+            if (integrandSel) {
+                var intSpan = document.createElement('span');
+                intSpan.innerHTML = '\\( \\int ' + integrandSel.latex + ' \\,dx = \\)';
+                intSpan.className = 'equation-item function';
+                activeEquation.appendChild(intSpan);
+                if (antiSel) {
+                    var antiSpan = document.createElement('span');
+                    antiSpan.innerHTML = '\\( ' + antiSel.latex + ' \\)';
+                    antiSpan.className = 'equation-item antiderivative';
+                    activeEquation.appendChild(antiSpan);
+                }
+            } else {
+                gameState.activeSelection.forEach(function(sel) {
+                    var span = document.createElement('span');
+                    span.innerHTML = '\\( ' + sel.latex + ' \\)';
+                    span.className = 'equation-item ' + sel.blockType;
+                    activeEquation.appendChild(span);
+                });
+            }
+        } else if (gameState.currentMode === 'normal') {
+            var funcSel = null;
+            for (var si = 0; si < gameState.activeSelection.length; si++) {
+                if (gameState.activeSelection[si].ids.preusubId.length > 0) {
+                    funcSel = gameState.activeSelection[si];
+                    break;
+                }
+            }
+            if (funcSel) {
+                var funcSpan = document.createElement('span');
+                funcSpan.innerHTML = '\\( ' + funcSel.latex + ' \\)';
+                funcSpan.className = 'equation-item function';
+                activeEquation.appendChild(funcSpan);
+
+                // u-sub steps are a transformation chain, not equalities: ∫f dx → u=g → ∫…du
+                var others = gameState.activeSelection.filter(function(sel) { return sel !== funcSel; });
+                if (others.length > 0) {
+                    var eq = document.createElement('span');
+                    eq.innerHTML = '\\( \\rightarrow \\)';
+                    eq.className = 'equation-item operator';
+                    activeEquation.appendChild(eq);
+                }
+                others.forEach(function(sel, idx) {
+                    if (idx > 0) {
+                        var sep = document.createElement('span');
+                        sep.innerHTML = '\\( \\rightarrow \\)';
+                        sep.className = 'equation-item operator';
+                        activeEquation.appendChild(sep);
+                    }
+                    var span = document.createElement('span');
+                    span.innerHTML = '\\( ' + sel.latex + ' \\)';
+                    span.className = 'equation-item antiderivative';
+                    activeEquation.appendChild(span);
+                });
+            }
+        } else if (gameState.currentMode === 'hard') {
+            var funcSel = null, uvSel = null, vupSel = null;
+            for (var si = 0; si < gameState.activeSelection.length; si++) {
+                var s = gameState.activeSelection[si];
+                if (s.ids.uvpId.length > 0) funcSel = s;
+                if (s.ids.uvId.length > 0) uvSel = s;
+                if (s.ids.vupId.length > 0) vupSel = s;
+            }
+
+            if (funcSel) {
+                var funcSpan = document.createElement('span');
+                funcSpan.innerHTML = '\\( ' + funcSel.latex + ' \\)';
+                funcSpan.className = 'equation-item function';
+                activeEquation.appendChild(funcSpan);
+
+                var eq = document.createElement('span');
+                eq.innerHTML = '\\( = \\)';
+                eq.className = 'equation-item operator';
+                activeEquation.appendChild(eq);
+            }
+
+            if (uvSel) {
+                var uvSpan = document.createElement('span');
+                uvSpan.innerHTML = '\\( ' + uvSel.latex + ' \\)';
+                uvSpan.className = 'equation-item antiderivative';
+                activeEquation.appendChild(uvSpan);
+            }
+
+            if (vupSel) {
+                var minus = document.createElement('span');
+                minus.innerHTML = '\\( - \\)';
+                minus.className = 'equation-item operator';
+                activeEquation.appendChild(minus);
+
+                var vupSpan = document.createElement('span');
+                vupSpan.innerHTML = '\\( ' + vupSel.latex + ' \\)';
+                vupSpan.className = 'equation-item antiderivative';
+                activeEquation.appendChild(vupSpan);
+            }
+        }
+    }
+    renderMathJax();
+}
+
+
+// ============================================================
+// CLEAR
+// ============================================================
+
+function clearEquation() {
+    if (gameState.isProcessing) return;
+    clearEquationForce();
+}
+
+function clearEquationForce() {
+    gameState.activeSelection.forEach(function(sel) {
+        if (sel.element) {
+            sel.element.classList.remove('is-selected', 'selected-function', 'selected-derivative', 'selected-antiderivative', 'error', 'match-success');
+        }
+    });
+    gameState.activeSelection = [];
+    activeEquation.innerHTML = '';
+    renderMathJax();
+}
+
+// ============================================================
+// MATHJAX
+// ============================================================
+
+function renderMathJax() {
+    if (typeof renderMathInElement !== 'undefined') {
+        renderMathInElement(document.body, {
+            delimiters: [{left: '\\(', right: '\\)', display: false}],
+            throwOnError: false
+        });
+    }
+}
+
+// ============================================================
+// TIMER & UI
+// ============================================================
+
+function startTimer() {
+    // Don't run the clock while the help overlay is up — it pauses the game.
+    // (Covers the race where a board finishes loading after the player opens help.)
+    if (howtoOverlay && !howtoOverlay.classList.contains('hidden')) return;
+    if (gameState.timer) clearInterval(gameState.timer);
+    gameState.timer = setInterval(function() {
+        gameState.timeLeft = Math.max(0, gameState.timeLeft - 1);
+        updateUI();
+        if (gameState.timeLeft <= 0) {
+            clearInterval(gameState.timer);
+            showResult(false);
+        }
+    }, 1000);
+}
+
+function updateUI() {
+    timerElement.textContent = gameState.timeLeft;
+    scoreElement.textContent = gameState.score;
+}
+
+
+// ============================================================
+// HOW-TO-PLAY (instructions)
+// ============================================================
+
+// The three universal rules, shown on the landing panel and inside the in-game help.
+var GENERAL_RULES = [
+    { title: 'Match each pair', text: 'A function with its derivative — or an integrand with its antiderivative.' },
+    { title: 'Tap to build', text: 'Click blocks and they combine in the bar up top. Re-click (or right-click) a block to deselect it.' },
+    { title: 'Beat the clock', text: 'Clear the whole board in 60 seconds. A wrong match costs you 5 seconds.' }
+];
+
+// Per-mode mechanics: how many blocks and the click order. Mirrors the click
+// handlers (handleDerivaHardClick / handleIntegraMultiClick) — keep in sync.
+var MODE_HELP = {
+    'deriva:basic':    { blocks: 2, steps: ['Tap a function and its derivative — either order works.'] },
+    'deriva:product':  { blocks: 2, steps: ['Tap a product and its derivative — either order works.'] },
+    'deriva:quotient': { blocks: 2, steps: ['Tap a quotient and its derivative — either order works.'] },
+    'deriva:chain':    { blocks: 3, steps: ['Tap the composite function f(g(x)) first.', 'Then tap its two derivative factors.'] },
+    'integra:easy':    { blocks: 2, steps: ['Tap an integral and its antiderivative — either order works.'] },
+    'integra:normal':  { blocks: 3, steps: ['Tap the integral ∫f dx first.', 'Then the substitution u = g.', 'Then the rewritten integral ∫…du.'] },
+    'integra:hard':    { blocks: 3, steps: ['Tap the integral ∫u·v′ dx first.', 'Then u·v and the integral ∫u′v dx.'] }
+};
+
+var howtoOverlay = document.getElementById('howto-overlay');
+
+function generalRulesHTML() {
+    return GENERAL_RULES.map(function(r, i) {
+        return '<div class="howto-row">' +
+            '<span class="howto-num">' + (i + 1) + '</span>' +
+            '<div><div class="howto-row-title">' + r.title + '</div>' +
+            '<div class="howto-row-text">' + r.text + '</div></div></div>';
+    }).join('');
+}
+
+// True only while a board is being played (no selection/result overlay covering it).
+function howtoInActiveGame() {
+    return gameState.timeLeft > 0 &&
+        resultOverlay.classList.contains('hidden') &&
+        gameOverlay.classList.contains('hidden') &&
+        levelOverlay.classList.contains('hidden') &&
+        configOverlay.classList.contains('hidden');
+}
+
+function openHowToOverlay() {
+    var body = document.getElementById('howto-body-game');
+    if (body) {
+        var html = '';
+        var mh = MODE_HELP[gameState.currentGame + ':' + gameState.currentMode];
+        if (mh) {
+            html += '<div class="howto-mode">' +
+                '<div class="howto-mode-title">' +
+                modeTitle(gameState.currentGame, gameState.currentMode) +
+                ' — match ' + mh.blocks + ' blocks</div>' +
+                '<ol class="howto-steps">' +
+                mh.steps.map(function(s) { return '<li>' + s + '</li>'; }).join('') +
+                '</ol></div>';
+        }
+        html += '<div class="howto-general-label">The basics</div>' + generalRulesHTML();
+        body.innerHTML = html;
+    }
+    // Pause the timer while the player reads the rules.
+    clearInterval(gameState.timer);
+    howtoOverlay.classList.remove('hidden');
+}
+
+function closeHowToOverlay() {
+    howtoOverlay.classList.add('hidden');
+    if (howtoInActiveGame()) startTimer();
+}

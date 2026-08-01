@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CalcMatch (offline)</title>
+    <link rel="icon" href="data:,">
+    <!-- Offline build: KaTeX + fonts are vendored locally, so this page has NO
+         external dependency and works with no network / CDN down. -->
+    <!-- Preload the two KaTeX fonts every board uses, so math paints without a font stall. -->
+    <link rel="preload" as="font" type="font/woff2" crossorigin href="vendor/katex/fonts/KaTeX_Main-Regular.woff2">
+    <link rel="preload" as="font" type="font/woff2" crossorigin href="vendor/katex/fonts/KaTeX_Math-Italic.woff2">
+    <link rel="stylesheet" href="style.css?v=static2">
+    <link rel="stylesheet" href="vendor/katex/katex.min.css">
+    <script defer src="vendor/katex/katex.min.js"></script>
+    <script defer src="vendor/katex/contrib/auto-render.min.js"></script>
+</head>
+<body>
+    <!-- Game Selection Overlay -->
+    <div id="game-overlay" class="overlay">
+        <div class="overlay-content">
+            <h1>CalcMatch</h1>
+            <p>Pick a game:</p>
+            <button class="level-btn game-deriva-btn" onclick="selectGame('deriva')">DerivaMatch<br><small>Derivatives: d/dx</small></button>
+            <button class="level-btn game-integra-btn" onclick="selectGame('integra')">IntegraMatch<br><small>Antiderivatives: &#8747; dx</small></button>
+        </div>
+    </div>
+
+    <!-- Level Selection Overlay -->
+    <div id="level-overlay" class="overlay hidden">
+        <div class="overlay-content">
+            <h1 id="level-game-title">DerivaMatch</h1>
+            <p>Select your level:</p>
+            <div id="level-buttons"></div>
+            <button class="level-btn back-btn" onclick="backToGameSelect()">Back</button>
+        </div>
+    </div>
+
+    <!-- Mode Config Overlay (difficulty preset OR custom function types) -->
+    <div id="config-overlay" class="overlay hidden">
+        <div class="overlay-content">
+            <h1 id="config-title">Basic</h1>
+            <p>Pick a difficulty…</p>
+            <button class="level-btn easy-btn" onclick="startWithPreset('easy')">Easy<br><small id="preset-easy-desc">Integer coefficients, fewer fractions</small></button>
+            <button class="level-btn normal-btn" onclick="startWithPreset('normal')">Normal<br><small id="preset-normal-desc">Full range, including fractions</small></button>
+            <button id="preset-hard" class="level-btn hard-btn" onclick="startWithPreset('hard')">Hard<br><small id="preset-hard-desc">Adds tan, cot, sec, csc</small></button>
+            <button class="level-btn back-btn" onclick="showLevelSelect()">Back</button>
+        </div>
+    </div>
+
+    <!-- How-to-Play Overlay (in-game, mode-aware) -->
+    <div id="howto-overlay" class="overlay hidden">
+        <div class="overlay-content">
+            <h1>How to play</h1>
+            <div id="howto-body-game" class="howto-body howto-body-game"></div>
+            <button class="level-btn back-btn" onclick="closeHowToOverlay()">Got it</button>
+        </div>
+    </div>
+
+    <!-- Pass/Fail Overlay -->
+    <div id="result-overlay" class="overlay hidden">
+        <div class="overlay-content">
+            <h1 id="result-title"></h1>
+            <p id="result-score"></p>
+            <button class="level-btn" onclick="replayLevel()">Replay</button>
+            <button class="level-btn" onclick="showLevelSelect()">Change Level</button>
+            <button class="level-btn" onclick="showGameSelect()">Change Game</button>
+        </div>
+    </div>
+
+    <div class="game-container">
+        <header class="top-bar">
+            <div class="timer">Time: <span id="timer">60</span>s</div>
+            <div class="score">Score: <span id="score">0</span></div>
+            <span class="level-label" id="level-label"></span>
+            <button id="howto-help" class="howto-help-btn" onclick="openHowToOverlay()" aria-label="How to play" title="How to play">?</button>
+            <button id="new-game" onclick="showLevelSelect()">New Game</button>
+        </header>
+
+        <div class="equation-bar">
+            <h3 id="equation-title">Active Equation:</h3>
+            <div id="active-equation" class="active-equation"></div>
+            <button id="clear-equation" onclick="clearEquation()">Clear</button>
+        </div>
+
+        <div id="color-legend" class="color-legend"></div>
+
+        <main class="game-board">
+            <div id="block-container" class="block-container"></div>
+        </main>
+    </div>
+
+    <!-- generator.js must load before game.js (defer preserves this order). -->
+    <script defer src="generator.js?v=static1"></script>
+    <script defer src="game.js?v=static2"></script>
+</body>
+</html>
